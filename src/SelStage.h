@@ -1,6 +1,15 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #pragma once
 
 #include "WindowsWrapper.h"
+
+#define STAGE_MAX 8 // Note that Cave Story only has 5 stages
 
 typedef struct PERMIT_STAGE
 {
@@ -8,7 +17,7 @@ typedef struct PERMIT_STAGE
 	int event;
 } PERMIT_STAGE;
 
-extern PERMIT_STAGE gPermitStage[8];
+extern PERMIT_STAGE gPermitStage[STAGE_MAX];
 
 extern int gSelectedStage;
 extern int gStageSelectTitleY;

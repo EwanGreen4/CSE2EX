@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "Input.h"
 
 #include <stddef.h>
@@ -19,7 +26,7 @@ BOOL InitDirectInput(void)
 	return ControllerBackend_Init();
 }
 
-BOOL GetJoystickStatus(JOYSTICK_STATUS *status)
+BOOL GetJoystickStatus(DIRECTINPUTSTATUS *status)
 {
 	const size_t button_limit = sizeof(status->bButton) / sizeof(status->bButton[0]);
 

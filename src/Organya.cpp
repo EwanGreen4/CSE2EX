@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 // Some of the original source code for this file can be found here:
 // https://github.com/shbow/organya/blob/master/source/OrgFile.cpp
 // https://github.com/shbow/organya/blob/master/source/OrgPlay.cpp
@@ -15,6 +22,7 @@
 #include "WindowsWrapper.h"
 
 #include "Backends/Audio.h"
+#include "Backends/Misc.h"
 #include "File.h"
 #include "Main.h"
 #include "Sound.h"
@@ -880,7 +888,12 @@ void StopOrganyaMusic(void)
 	memset(key_on, 0, sizeof(key_on));
 	memset(key_twin, 0, sizeof(key_twin));
 
-//	Sleep(100);	// TODO - Emulate this
+	// Put the main thread to sleep for 100 milliseconds... but why?
+	// Really, what's the point? All this does is cause an annoying
+	// stutter when a new song loads.
+	// I'd guess it avoids a race-condition with the Organya thread,
+	// but the earlier QuitMMTimer call already disables it.
+	Backend_Delay(100);
 }
 
 void SetOrganyaFadeout(void)

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -7,6 +14,7 @@
 
 #include "Bullet.h"
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Frame.h"
 #include "Game.h"
 #include "KeyControl.h"
@@ -75,7 +83,7 @@ void ActNpc121(NPCHAR *npc)
 		if (++npc->act_wait > 100)
 		{
 			npc->act_wait = 0;
-			SetCaret(npc->x, npc->y, 5, 0);
+			SetCaret(npc->x, npc->y, CARET_ZZZ, DIR_LEFT);
 		}
 	}
 }
@@ -285,7 +293,7 @@ void ActNpc123(NPCHAR *npc)
 	{
 		case 0:
 			npc->act_no = 1;
-			SetCaret(npc->x, npc->y, 3, 0);
+			SetCaret(npc->x, npc->y, CARET_SHOOT, DIR_LEFT);
 			PlaySoundObject(32, SOUND_MODE_PLAY);
 
 			switch (npc->direct)
@@ -345,7 +353,7 @@ void ActNpc123(NPCHAR *npc)
 
 	if (bBreak)
 	{
-		SetCaret(npc->x, npc->y, 2, 2);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_RIGHT);
 		PlaySoundObject(28, SOUND_MODE_PLAY);
 		npc->cond = 0;
 	}
@@ -589,7 +597,7 @@ void ActNpc127(NPCHAR *npc)
 		if (++npc->ani_no > 2)
 		{
 			npc->cond = 0;
-		#ifdef FIX_BUGS
+		#ifdef FIX_MAJOR_BUGS
 			return;	// The code below will use 'ani_no' to access 'rcH' and 'rcV', even though it's now too high
 		#endif
 		}
@@ -655,7 +663,7 @@ void ActNpc128(NPCHAR *npc)
 	if (++npc->ani_no > 4)
 	{
 		npc->cond = 0;
-	#ifdef FIX_BUGS
+	#ifdef FIX_MAJOR_BUGS
 		return;	// The code below will use 'ani_no' to access 'rcLeft' and co., even though it's now too high
 	#endif
 	}
@@ -716,7 +724,7 @@ void ActNpc129(NPCHAR *npc)
 		if (++npc->ani_no > 2)
 		{
 			npc->cond = 0;
-		#ifdef FIX_BUGS
+		#ifdef FIX_MAJOR_BUGS
 			return;	// The code below will use 'ani_no' to access 'rect', even though it's now too high
 		#endif
 		}
@@ -819,7 +827,7 @@ void ActNpc131(NPCHAR *npc)
 	if (++npc->act_wait > 100)
 	{
 		npc->act_wait = 0;
-		SetCaret(npc->x, npc->y, 5, 0);
+		SetCaret(npc->x, npc->y, CARET_ZZZ, DIR_LEFT);
 	}
 
 	if (npc->direct == 0)
@@ -1202,7 +1210,7 @@ void ActNpc135(NPCHAR *npc)
 			npc->direct = 2;
 	}
 
-	npc->ym += 0x33;
+	npc->ym += 0x200 / 10;
 	if (npc->ym > 0x5FF)
 		npc->ym = 0x5FF;
 

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "TextScr.h"
 
 #include <stddef.h>
@@ -70,7 +77,7 @@ BOOL InitTextScript2(void)
 
 	// Create line surfaces
 	for (i = 0; i < 4; ++i)
-		MakeSurface_Generic(gRect_line.right, gRect_line.bottom, (SurfaceID)(SURFACE_ID_TEXT_LINE1 + i), FALSE);
+		MakeSurface_Generic(gRect_line.right, gRect_line.bottom, (SurfaceID)(SURFACE_ID_TEXT_LINE1 + i), FALSE, TRUE);
 
 	// Clear text
 	memset(text, 0, sizeof(text));
@@ -671,7 +678,7 @@ int TextScriptProc(void)
 						x = GetTextScriptNo(gTS.p_read + 9);
 
 						gNumberTextScript[0] = x;
-					#ifndef FIX_BUGS
+					#ifndef FIX_MAJOR_BUGS
 						// z is uninitialised. Probably a leftover from copypasting this from elsewhere.
 						gNumberTextScript[1] = z;
 					#endif
@@ -732,12 +739,11 @@ int TextScriptProc(void)
 
 						if (!TransferStage(z, w, x, y))
 						{
-							#ifdef JAPANESE
-							Backend_ShowMessageBox("エラー", "ステージの読み込みに失敗");
-							#else
+						#if !defined(JAPANESE) && defined(FIX_BUGS) // The Aeon Genesis translation didn't translate this
 							Backend_ShowMessageBox("Error", "Failed to load stage");
-							#endif
-
+						#else
+							Backend_ShowMessageBox("エラー", "ステージの読み込みに失敗");
+						#endif
 							return enum_ESCRETURN_exit;
 						}
 					}
@@ -907,6 +913,32 @@ int TextScriptProc(void)
 						x = GetTextScriptNo(gTS.p_read + 4);
 						z = GetTextScriptNo(gTS.p_read + 9);
 
+					#ifdef FIX_MAJOR_BUGS
+						// Some versions of the Waterway TSC script contain a bug:
+						//  <FLJ850:0111
+						// This command *should* be...
+						//  <FLJ0850:0111
+						// This bug causes the values to be misread as 8510 and 1075,
+						// leading to an out-of-bounds gFlagNPC access.
+						// As well as this, the out-of-bound read has a random chance
+						// of being true or false. If it's true, then the game will
+						// try to execute script 1075, causing a crash.
+						// To fix this, we manually catch this error and use the
+						// correct values.
+						// This bug is present in...
+						//  Japanese 1.0.0.5 (and presumably earlier versions)
+						//  Aeon Genesis 1.0.0.5
+						//  Aeon Genesis 1.0.0.6
+						//  Cave Story (WiiWare)
+						//  Cave Story+ (Steam)
+						// Gee, I wonder how it snuck into the Nicalis ports. ¬_¬
+						if (!memcmp(&gTS.data[gTS.p_read + 4], "850:0111", 8))
+						{
+							x = 850;
+							z = 111;
+						}
+					#endif
+
 						if (GetNPCFlag(x))
 							JumpTextScript(z);
 						else
@@ -990,7 +1022,7 @@ int TextScriptProc(void)
 					}
 					else if (IS_COMMAND('S','P','S'))
 					{
-					#ifdef FIX_BUGS
+					#ifdef FIX_MAJOR_BUGS
 						SetNoise(2, 0);
 					#else
 						// x is not initialised. This bug isn't too bad, since that parameter's not used when the first one is set to 2, but still.
@@ -1011,7 +1043,7 @@ int TextScriptProc(void)
 					}
 					else if (IS_COMMAND('F','L','A'))
 					{
-						SetFlash(0, 0, 2);
+						SetFlash(0, 0, FLASH_MODE_FLASH);
 						gTS.p_read += 4;
 					}
 					else if (IS_COMMAND('F','A','I'))
@@ -1387,14 +1419,13 @@ int TextScriptProc(void)
 					else
 					{
 						char str_0[0x40];
-						#ifdef JAPANESE
-						sprintf(str_0, "不明のコード:<%c%c%c", gTS.data[gTS.p_read + 1], gTS.data[gTS.p_read + 2], gTS.data[gTS.p_read + 3]);
-						Backend_ShowMessageBox("エラー", str_0);
-						#else
+					#if !defined(JAPANESE) && defined(FIX_BUGS) // The Aeon Genesis translation didn't translate this
 						sprintf(str_0, "Unknown code:<%c%c%c", gTS.data[gTS.p_read + 1], gTS.data[gTS.p_read + 2], gTS.data[gTS.p_read + 3]);
 						Backend_ShowMessageBox("Error", str_0);
-						#endif
-
+					#else
+						sprintf(str_0, "不明のコード:<%c%c%c", gTS.data[gTS.p_read + 1], gTS.data[gTS.p_read + 2], gTS.data[gTS.p_read + 3]);
+						Backend_ShowMessageBox("エラー", str_0);
+					#endif
 						return enum_ESCRETURN_exit;
 					}
 				}
@@ -1431,7 +1462,15 @@ int TextScriptProc(void)
 						memcpy(str, &gTS.data[gTS.p_read], y);
 						str[y] = '\0';
 
+						// This should have been 'y', not 'x'. This mistake causes the blinking
+						// cursor to render offscreen. Even if this were fixed, the broken font
+						// spacing (see InitTextObject in Draw.cpp) would likely cause it to
+						// still appear in the wrong place anyway.
+					//#ifdef FIX_BUGS
+					//	gTS.p_write = y;
+					//#else
 						gTS.p_write = x;
+					//#endif
 
 						// Print text
 						PutText2(0, 0, str, RGB(0xFF, 0xFF, 0xFE), (SurfaceID)(SURFACE_ID_TEXT_LINE1 + (gTS.line % 4)));

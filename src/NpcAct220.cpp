@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -5,6 +12,7 @@
 #include "WindowsWrapper.h"
 
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Game.h"
 #include "MyChar.h"
 #include "NpChar.h"
@@ -617,9 +625,9 @@ void ActNpc231(NPCHAR *npc)
 			++npc->act_wait;
 
 			if (npc->act_wait % 2 == 0)
-				SetCaret(npc->x - (10 * 0x200), npc->y + (8 * 0x200), 7, 3);
+				SetCaret(npc->x - (10 * 0x200), npc->y + (8 * 0x200), CARET_EXHAUST, DIR_DOWN);
 			if (npc->act_wait % 2 == 1)
-				SetCaret(npc->x + (10 * 0x200), npc->y + (8 * 0x200), 7, 3);
+				SetCaret(npc->x + (10 * 0x200), npc->y + (8 * 0x200), CARET_EXHAUST, DIR_DOWN);
 
 			if (npc->act_wait % 4 == 1)
 				PlaySoundObject(34, SOUND_MODE_PLAY);
@@ -647,10 +655,10 @@ void ActNpc231(NPCHAR *npc)
 			if (npc->ym < 0)
 			{
 				if (npc->act_wait % 8 == 0)
-					SetCaret(npc->x - (10 * 0x200), npc->y + (8 * 0x200), 7, 3);
+					SetCaret(npc->x - (10 * 0x200), npc->y + (8 * 0x200), CARET_EXHAUST, DIR_DOWN);
 
 				if (npc->act_wait % 8 == 4)
-					SetCaret(npc->x + (10 * 0x200), npc->y + (8 * 0x200), 7, 3);
+					SetCaret(npc->x + (10 * 0x200), npc->y + (8 * 0x200), CARET_EXHAUST, DIR_DOWN);
 
 				if (npc->act_wait % 16 == 1)
 					PlaySoundObject(34, SOUND_MODE_PLAY);
@@ -1153,7 +1161,7 @@ void ActNpc237(NPCHAR *npc)
 			if (bHit)
 			{
 				for (i = 0; i < 5; ++i)
-					SetCaret(npc->x, npc->y, 1, 0);
+					SetCaret(npc->x, npc->y, CARET_BUBBLE, DIR_LEFT);
 
 				PlaySoundObject(21, SOUND_MODE_PLAY);
 				npc->cond = 0;

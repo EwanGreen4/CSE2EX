@@ -1,3 +1,6 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "../OpenGL.h"
 
 #include <stddef.h>
@@ -9,13 +12,13 @@
 #include "SDL.h"
 
 #include "../../../Misc.h"
-#include "../../../Shared/SDL2.h"
+#include "../../../Shared/SDL.h"
 
 SDL_Window *window;
 
 static SDL_GLContext context;
 
-bool WindowBackend_OpenGL_CreateWindow(const char *window_title, int *screen_width, int *screen_height, bool fullscreen, bool vsync)
+bool WindowBackend_OpenGL_CreateWindow(const char *window_title, size_t *screen_width, size_t *screen_height, bool fullscreen, bool vsync)
 {
 #ifdef USE_OPENGLES2
 	if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES) < 0)
@@ -60,8 +63,7 @@ bool WindowBackend_OpenGL_CreateWindow(const char *window_title, int *screen_wid
 					if (GLAD_GL_VERSION_3_2)
 					{
 			#endif
-						if (vsync)
-							SDL_GL_SetSwapInterval(1);
+						SDL_GL_SetSwapInterval(vsync ? 1 : 0);	// Set vsync
 
 						Backend_PostWindowCreation();
 

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "Main.h"
 
 #include <stddef.h>
@@ -21,10 +28,14 @@
 #include "KeyControl.h"
 #include "MyChar.h"
 #include "Organya.h"
+#include "Profile.h"
 #include "Resource.h"
 #include "Stage.h"
 #include "Sound.h"
 #include "Triangle.h"
+
+void InactiveWindow(void);
+void ActiveWindow(void);
 
 std::string gModulePath;
 std::string gDataPath;
@@ -41,6 +52,19 @@ static const char* const lpWindowName = "洞窟物語";	// "Cave Story"
 #else
 static const char* const lpWindowName = "Cave Story ~ Doukutsu Monogatari";
 #endif
+
+static void DragAndDropCallback(const char *path)
+{
+	LoadProfile(path);
+}
+
+static void WindowFocusCallback(bool focus)
+{
+	if (focus)
+		ActiveWindow();
+	else
+		InactiveWindow();
+}
 
 // Framerate stuff
 static unsigned long CountFramePerSecound(void)
@@ -84,11 +108,11 @@ int main(int argc, char *argv[])
 {
 	(void)argc;
 
-	if (!Backend_Init())
+	if (!Backend_Init(DragAndDropCallback, WindowFocusCallback))
 		return EXIT_FAILURE;
 
-	// Get executable's path
-	if (!Backend_GetBasePath(&gModulePath))
+	// Get executable's path, and path of the data folder
+	if (!Backend_GetPaths(&gModulePath, &gDataPath))
 	{
 		// Fall back on argv[0] if the backend cannot provide a path
 		gModulePath = argv[0];
@@ -101,12 +125,11 @@ int main(int argc, char *argv[])
 				break;
 			}
 		}
+
+		gDataPath = gModulePath + "/data";
 	}
 
-	// Get path of the data folder
-	gDataPath = gModulePath + "/data";
-
-	CONFIG conf;
+	CONFIGDATA conf;
 	if (!LoadConfigData(&conf))
 		DefaultConfigData(&conf);
 
@@ -121,7 +144,7 @@ int main(int argc, char *argv[])
 		default:
 			// Windowed
 
-		#ifdef FIX_BUGS
+		#ifdef FIX_MAJOR_BUGS
 			if (!StartDirectDraw(lpWindowName, conf.display_mode, conf.b60fps, conf.bSmoothScrolling, conf.bVsync))
 			{
 				Backend_Deinit();
@@ -137,7 +160,7 @@ int main(int argc, char *argv[])
 		case 0:
 			// Fullscreen
 
-		#ifdef FIX_BUGS
+		#ifdef FIX_MAJOR_BUGS
 			if (!StartDirectDraw(lpWindowName, 0, conf.b60fps, conf.bSmoothScrolling, conf.bVsync))
 			{
 				Backend_Deinit();
@@ -155,7 +178,7 @@ int main(int argc, char *argv[])
 	}
 
 #ifdef DEBUG_SAVE
-	PlaybackBackend_EnableDragAndDrop();
+	Backend_EnableDragAndDrop();
 #endif
 
 	// Set up window icon
@@ -165,8 +188,8 @@ int main(int argc, char *argv[])
 
 	if (window_icon_resource_data != NULL)
 	{
-		unsigned int window_icon_width, window_icon_height;
-		unsigned char *window_icon_rgb_pixels = DecodeBitmap(window_icon_resource_data, window_icon_resource_size, &window_icon_width, &window_icon_height);
+		size_t window_icon_width, window_icon_height;
+		unsigned char *window_icon_rgb_pixels = DecodeBitmap(window_icon_resource_data, window_icon_resource_size, &window_icon_width, &window_icon_height, 3);
 
 		if (window_icon_rgb_pixels != NULL)
 		{
@@ -179,8 +202,8 @@ int main(int argc, char *argv[])
 	// Set up the cursor
 	std::string cursor_path = gDataPath + "/Resource/CURSOR/CURSOR_NORMAL.png";
 
-	unsigned int cursor_width, cursor_height;
-	unsigned char *cursor_rgba_pixels = DecodeBitmapWithAlphaFromFile(cursor_path.c_str(), &cursor_width, &cursor_height, FALSE);
+	size_t cursor_width, cursor_height;
+	unsigned char *cursor_rgba_pixels = DecodeBitmapFromFile(cursor_path.c_str(), &cursor_width, &cursor_height, 4);
 
 	if (cursor_rgba_pixels != NULL)
 	{
@@ -274,7 +297,10 @@ BOOL SystemTask(void)
 	do
 	{
 		if (!Backend_SystemTask(bActive))
+		{
+			StopOrganyaMusic();
 			return FALSE;
+		}
 	} while(!bActive);
 
 	Backend_GetKeyboardState(gKeyboardState);
@@ -366,7 +392,7 @@ BOOL SystemTask(void)
 void JoystickProc(void)
 {
 	int i;
-	static JOYSTICK_STATUS old_status;
+	static DIRECTINPUTSTATUS old_status;
 
 	if (!GetJoystickStatus(&gJoystickState))
 		memset(&gJoystickState, 0, sizeof(gJoystickState));

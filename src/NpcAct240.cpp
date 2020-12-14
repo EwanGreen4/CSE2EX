@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -5,6 +12,7 @@
 #include "WindowsWrapper.h"
 
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Frame.h"
 #include "Game.h"
 #include "Map.h"
@@ -338,7 +346,7 @@ void ActNpc244(NPCHAR *npc)
 	if (bHit)
 	{
 		for (i = 0; i < 3; ++i)
-			SetCaret(npc->x, npc->y + (4 * 0x200), 1, 2);
+			SetCaret(npc->x, npc->y + (4 * 0x200), CARET_BUBBLE, DIR_RIGHT);
 
 		if (npc->x > gMC.x - (256 * 0x200) && npc->x < gMC.x + (256 * 0x200) && npc->y > gMC.y - (160 * 0x200) && npc->y < gMC.y + (160 * 0x200))
 			PlaySoundObject(21, SOUND_MODE_PLAY);
@@ -831,7 +839,7 @@ void ActNpc248(NPCHAR *npc)
 	if (npc->flag & 0xFF)
 	{
 		npc->cond = 0;
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 	}
 
 	npc->y += npc->ym;
@@ -856,7 +864,7 @@ void ActNpc248(NPCHAR *npc)
 	if (++npc->count1 > 300)
 	{
 		npc->cond = 0;
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 	}
 }
 

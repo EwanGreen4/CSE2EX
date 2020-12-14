@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #pragma once
 
 #include "WindowsWrapper.h"
@@ -7,7 +14,7 @@
 #include "SelStage.h"
 #include "Stage.h"
 
-typedef struct PROFILE
+typedef struct PROFILEDATA
 {
 	char code[8];
 	int stage;
@@ -39,7 +46,7 @@ typedef struct PROFILE
 	MYCHAR_PHYSICS physics_normal;
 	MYCHAR_PHYSICS physics_underwater;
 	int no_splash_or_air_limit_underwater;
-} PROFILE;
+} PROFILEDATA;
 
 extern const char* const gDefaultName;
 extern const char* const gProfileCode;

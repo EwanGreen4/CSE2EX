@@ -1,4 +1,4 @@
-// Ogg Vorbis audio decoder - v1.19 - public domain
+// Ogg Vorbis audio decoder - v1.20 - public domain
 // http://nothings.org/stb_vorbis/
 //
 // Original version written by Sean Barrett in 2007.
@@ -31,9 +31,11 @@
 //    Phillip Bennefall  Rohit               Thiago Goulart
 //    github:manxorist   saga musix          github:infatum
 //    Timur Gagiev       Maxwell Koo         Peter Waller
-//    github:audinowho   Dougall Johnson     Pedro J. Estébanez
+//    github:audinowho   Dougall Johnson     David Reid
+//    github:Clownacy    Pedro J. Estebanez  Remi Verschelde
 //
 // Partial history:
+//    1.20    - 2020-07-11 - several small fixes
 //    1.19    - 2020-02-05 - warnings
 //    1.18    - 2020-02-02 - fix seek bugs; parse header comments; misc warnings etc.
 //    1.17    - 2019-07-08 - fix CVE-2019-13217..CVE-2019-13223 (by ForAllSecure)
@@ -930,6 +932,10 @@ static void *make_block_array(void *mem, int count, int size)
    return p;
 }
 
+// sentinel buffer returned for empty setup_malloc()
+// declared const to catch illegal writes
+static const char setup_malloc_null_buffer[1] = { 0 };
+
 static void *setup_malloc(vorb *f, int sz)
 {
    sz = (sz+7) & ~7; // round up to nearest 8 for alignment of future allocs.
@@ -940,13 +946,15 @@ static void *setup_malloc(vorb *f, int sz)
       f->setup_offset += sz;
       return p;
    }
-   return sz ? malloc(sz) : NULL;
+   return sz ? malloc(sz) : (void*)setup_malloc_null_buffer;
 }
 
 static void setup_free(vorb *f, void *p)
 {
    if (f->alloc.alloc_buffer) return; // do nothing; setup mem is a stack
-   free(p);
+   if (p != setup_malloc_null_buffer) {
+      free(p);
+   }
 }
 
 static void *setup_temp_malloc(vorb *f, int sz)
@@ -1602,7 +1610,8 @@ static uint32 get_bits(vorb *f, int n)
          f->valid_bits += 8;
       }
    }
-   if (f->valid_bits < 0) return 0;
+
+   assert(f->valid_bits >= n);
    z = f->acc & ((1 << n)-1);
    f->acc >>= n;
    f->valid_bits -= n;
@@ -3632,6 +3641,7 @@ static int start_decoder(vorb *f)
    //file vendor
    len = get32_packet(f);
    f->vendor = (char*)setup_malloc(f, sizeof(char) * (len+1));
+   if (f->vendor == NULL)                           return error(f, VORBIS_outofmem);
    for(i=0; i < len; ++i) {
       f->vendor[i] = get8_packet(f);
    }
@@ -3639,10 +3649,12 @@ static int start_decoder(vorb *f)
    //user comments
    f->comment_list_length = get32_packet(f);
    f->comment_list = (char**)setup_malloc(f, sizeof(char*) * (f->comment_list_length));
+   if (f->comment_list == NULL)                     return error(f, VORBIS_outofmem);
 
    for(i=0; i < f->comment_list_length; ++i) {
       len = get32_packet(f);
       f->comment_list[i] = (char*)setup_malloc(f, sizeof(char) * (len+1));
+      if (f->comment_list[i] == NULL)               return error(f, VORBIS_outofmem);
 
       for(j=0; j < len; ++j) {
          f->comment_list[i][j] = get8_packet(f);
@@ -4255,7 +4267,7 @@ static void vorbis_init(stb_vorbis *p, const stb_vorbis_alloc *z)
    memset(p, 0, sizeof(*p)); // NULL out all malloc'd pointers to start
    if (z) {
       p->alloc = *z;
-      p->alloc.alloc_buffer_length_in_bytes = (p->alloc.alloc_buffer_length_in_bytes+3) & ~3;
+      p->alloc.alloc_buffer_length_in_bytes &= ~7;
       p->temp_offset = p->alloc.alloc_buffer_length_in_bytes;
    }
    p->eof = 0;

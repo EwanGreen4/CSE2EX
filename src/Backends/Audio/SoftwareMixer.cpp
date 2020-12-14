@@ -1,179 +1,224 @@
-#include "SoftwareMixer.h"
+// Released under the MIT licence.
+// See LICENCE.txt for details.
 
-#include <math.h>
+#include "../Audio.h"
+
 #include <stddef.h>
-#include <stdlib.h>
 
-#include "../../Attributes.h"
+#ifdef EXTRA_SOUND_FORMATS
+#include "../../ExtraSoundFormats.h"
+#endif
+
+#include "SoftwareMixer/Backend.h"
+#include "SoftwareMixer/Mixer.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define CLAMP(x, y, z) MIN(MAX((x), (y)), (z))
-
-struct Mixer_Sound
-{
-	signed char *samples;
-	size_t frames;
-	size_t position;
-	unsigned long sample_offset_remainder;  // 16.16 fixed-point
-	unsigned long advance_delta;            // 16.16 fixed-point
-	bool playing;
-	bool looping;
-	short volume;    // 8.8 fixed-point
-	short pan_l;     // 8.8 fixed-point
-	short pan_r;     // 8.8 fixed-point
-	short volume_l;  // 8.8 fixed-point
-	short volume_r;  // 8.8 fixed-point
-
-	struct Mixer_Sound *next;
-};
-
-static Mixer_Sound *sound_list_head;
 
 static unsigned long output_frequency;
 
-static unsigned short MillibelToScale(long volume)
+static void (*organya_callback)(void);
+static unsigned int organya_callback_timer_master;
+
+static void MixSoundsAndUpdateOrganya(long *stream, size_t frames_total)
 {
-	// Volume is in hundredths of a decibel, from 0 to -10000
-	volume = CLAMP(volume, -10000, 0);
-	return (unsigned short)(pow(10.0, volume / 2000.0) * 256.0f);
-}
+	SoftwareMixerBackend_LockOrganyaMutex();
 
-void Mixer_Init(unsigned long frequency)
-{
-	output_frequency = frequency;
-}
-
-Mixer_Sound* Mixer_CreateSound(unsigned int frequency, const unsigned char *samples, size_t length)
-{
-	Mixer_Sound *sound = (Mixer_Sound*)malloc(sizeof(Mixer_Sound));
-
-	if (sound == NULL)
-		return NULL;
-
-	sound->samples = (signed char*)malloc(length + 1);
-
-	if (sound->samples == NULL)
+	if (organya_callback_timer_master == 0)
 	{
-		free(sound);
-		return NULL;
+		SoftwareMixerBackend_LockMixerMutex();
+		Mixer_MixSounds(stream, frames_total);
+		SoftwareMixerBackend_UnlockMixerMutex();
 	}
-
-	for (size_t i = 0; i < length; ++i)
-		sound->samples[i] = samples[i] - 0x80;	// Convert from unsigned 8-bit PCM to signed
-
-	sound->frames = length;
-	sound->playing = false;
-	sound->position = 0;
-	sound->sample_offset_remainder = 0;
-
-	Mixer_SetSoundFrequency(sound, frequency);
-	Mixer_SetSoundVolume(sound, 0);
-	Mixer_SetSoundPan(sound, 0);
-
-	sound->next = sound_list_head;
-	sound_list_head = sound;
-
-	return sound;
-}
-
-void Mixer_DestroySound(Mixer_Sound *sound)
-{
-	for (Mixer_Sound **sound_pointer = &sound_list_head; *sound_pointer != NULL; sound_pointer = &(*sound_pointer)->next)
+	else
 	{
-		if (*sound_pointer == sound)
+		// Synchronise audio generation with Organya.
+		// In the original game, Organya ran asynchronously in a separate thread,
+		// firing off commands to DirectSound in realtime. To match that, we'd
+		// need a very low-latency buffer, otherwise we'd get mistimed instruments.
+		// Instead, we can just do this.
+		unsigned int frames_done = 0;
+
+		while (frames_done != frames_total)
 		{
-			*sound_pointer = sound->next;
-			free(sound->samples);
-			free(sound);
-			break;
-		}
-	}
-}
+			static unsigned long organya_callback_timer;
 
-void Mixer_PlaySound(Mixer_Sound *sound, bool looping)
-{
-	sound->playing = true;
-	sound->looping = looping;
-
-	sound->samples[sound->frames] = looping ? sound->samples[0] : 0;	// For the linear interpolator
-}
-
-void Mixer_StopSound(Mixer_Sound *sound)
-{
-	sound->playing = false;
-}
-
-void Mixer_RewindSound(Mixer_Sound *sound)
-{
-	sound->position = 0;
-	sound->sample_offset_remainder = 0;
-}
-
-void Mixer_SetSoundFrequency(Mixer_Sound *sound, unsigned int frequency)
-{
-	sound->advance_delta = (frequency << 16) / output_frequency;
-}
-
-void Mixer_SetSoundVolume(Mixer_Sound *sound, long volume)
-{
-	sound->volume = MillibelToScale(volume);
-
-	sound->volume_l = (sound->pan_l * sound->volume) >> 8;
-	sound->volume_r = (sound->pan_r * sound->volume) >> 8;
-}
-
-void Mixer_SetSoundPan(Mixer_Sound *sound, long pan)
-{
-	sound->pan_l = MillibelToScale(-pan);
-	sound->pan_r = MillibelToScale(pan);
-
-	sound->volume_l = (sound->pan_l * sound->volume) >> 8;
-	sound->volume_r = (sound->pan_r * sound->volume) >> 8;
-}
-
-// Most CPU-intensive function in the game (2/3rd CPU time consumption in my experience), so marked with ATTRIBUTE_HOT so the compiler considers it a hot spot (as it is) when optimizing
-ATTRIBUTE_HOT void Mixer_MixSounds(long *stream, size_t frames_total)
-{
-	for (Mixer_Sound *sound = sound_list_head; sound != NULL; sound = sound->next)
-	{
-		if (sound->playing)
-		{
-			long *stream_pointer = stream;
-
-			for (size_t frames_done = 0; frames_done < frames_total; ++frames_done)
+			if (organya_callback_timer == 0)
 			{
-				// Perform linear interpolation
-				const unsigned char subsample = sound->sample_offset_remainder >> 8;
-
-				const short interpolated_sample = sound->samples[sound->position] * (0x100 - subsample)
-				                                      + sound->samples[sound->position + 1] * subsample;
-
-				// Mix, and apply volume
-				*stream_pointer++ += (interpolated_sample * sound->volume_l) >> 8;
-				*stream_pointer++ += (interpolated_sample * sound->volume_r) >> 8;
-
-				// Increment sample
-				sound->sample_offset_remainder += sound->advance_delta;
-				sound->position += sound->sample_offset_remainder >> 16;
-				sound->sample_offset_remainder &= 0xFFFF;
-
-				// Stop or loop sample once it's reached its end
-				if (sound->position >= sound->frames)
-				{
-					if (sound->looping)
-					{
-						sound->position %= sound->frames;
-					}
-					else
-					{
-						sound->playing = false;
-						sound->position = 0;
-						sound->sample_offset_remainder = 0;
-						break;
-					}
-				}
+				organya_callback_timer = organya_callback_timer_master;
+				organya_callback();
 			}
+
+			const unsigned int frames_to_do = MIN(organya_callback_timer, frames_total - frames_done);
+
+			SoftwareMixerBackend_LockMixerMutex();
+			Mixer_MixSounds(stream + frames_done * 2, frames_to_do);
+			SoftwareMixerBackend_UnlockMixerMutex();
+
+			frames_done += frames_to_do;
+			organya_callback_timer -= frames_to_do;
 		}
 	}
+
+	SoftwareMixerBackend_UnlockOrganyaMutex();
+
+#ifdef EXTRA_SOUND_FORMATS
+	ExtraSound_Mix(stream, frames_total);
+#endif
+}
+
+bool AudioBackend_Init(void)
+{
+	output_frequency = SoftwareMixerBackend_Init(MixSoundsAndUpdateOrganya);
+
+	if (output_frequency != 0)
+	{
+	#ifdef EXTRA_SOUND_FORMATS
+		ExtraSound_Init(output_frequency);
+	#endif
+
+		Mixer_Init(output_frequency);
+
+		if (SoftwareMixerBackend_Start())
+			return true;
+
+		SoftwareMixerBackend_Deinit();
+
+	#ifdef EXTRA_SOUND_FORMATS
+		ExtraSound_Deinit();
+	#endif
+	}
+
+	return false;
+}
+
+void AudioBackend_Deinit(void)
+{
+	SoftwareMixerBackend_Deinit();
+
+#ifdef EXTRA_SOUND_FORMATS
+	ExtraSound_Deinit();
+#endif
+}
+
+AudioBackend_Sound* AudioBackend_CreateSound(unsigned int frequency, const unsigned char *samples, size_t length)
+{
+	SoftwareMixerBackend_LockMixerMutex();
+
+	Mixer_Sound *sound = Mixer_CreateSound(frequency, samples, length);
+
+	SoftwareMixerBackend_UnlockMixerMutex();
+
+	return (AudioBackend_Sound*)sound;
+}
+
+void AudioBackend_DestroySound(AudioBackend_Sound *sound)
+{
+	if (sound == NULL)
+		return;
+
+	SoftwareMixerBackend_LockMixerMutex();
+
+	Mixer_DestroySound((Mixer_Sound*)sound);
+
+	SoftwareMixerBackend_UnlockMixerMutex();
+}
+
+void AudioBackend_PlaySound(AudioBackend_Sound *sound, bool looping)
+{
+	if (sound == NULL)
+		return;
+
+	SoftwareMixerBackend_LockMixerMutex();
+
+	Mixer_PlaySound((Mixer_Sound*)sound, looping);
+
+	SoftwareMixerBackend_UnlockMixerMutex();
+}
+
+void AudioBackend_StopSound(AudioBackend_Sound *sound)
+{
+	if (sound == NULL)
+		return;
+
+	SoftwareMixerBackend_LockMixerMutex();
+
+	Mixer_StopSound((Mixer_Sound*)sound);
+
+	SoftwareMixerBackend_UnlockMixerMutex();
+}
+
+void AudioBackend_RewindSound(AudioBackend_Sound *sound)
+{
+	if (sound == NULL)
+		return;
+
+	SoftwareMixerBackend_LockMixerMutex();
+
+	Mixer_RewindSound((Mixer_Sound*)sound);
+
+	SoftwareMixerBackend_UnlockMixerMutex();
+}
+
+void AudioBackend_SetSoundFrequency(AudioBackend_Sound *sound, unsigned int frequency)
+{
+	if (sound == NULL)
+		return;
+
+	SoftwareMixerBackend_LockMixerMutex();
+
+	Mixer_SetSoundFrequency((Mixer_Sound*)sound, frequency);
+
+	SoftwareMixerBackend_UnlockMixerMutex();
+}
+
+void AudioBackend_SetSoundVolume(AudioBackend_Sound *sound, long volume)
+{
+	if (sound == NULL)
+		return;
+
+	SoftwareMixerBackend_LockMixerMutex();
+
+	Mixer_SetSoundVolume((Mixer_Sound*)sound, volume);
+
+	SoftwareMixerBackend_UnlockMixerMutex();
+}
+
+void AudioBackend_SetSoundPan(AudioBackend_Sound *sound, long pan)
+{
+	if (sound == NULL)
+		return;
+
+	SoftwareMixerBackend_LockMixerMutex();
+
+	Mixer_SetSoundPan((Mixer_Sound*)sound, pan);
+
+	SoftwareMixerBackend_UnlockMixerMutex();
+}
+
+void AudioBackend_SetOrganyaCallback(void (*callback)(void))
+{
+	SoftwareMixerBackend_LockOrganyaMutex();
+
+	organya_callback = callback;
+
+	SoftwareMixerBackend_UnlockOrganyaMutex();
+}
+
+void AudioBackend_SetOrganyaTimer(unsigned int milliseconds)
+{
+	SoftwareMixerBackend_LockOrganyaMutex();
+
+	organya_callback_timer_master = (milliseconds * output_frequency) / 1000; // convert milliseconds to audio frames
+
+	SoftwareMixerBackend_UnlockOrganyaMutex();
+}
+
+void AudioBackend_Lock(void)
+{
+	SoftwareMixerBackend_LockMixerMutex();
+}
+
+void AudioBackend_Unlock(void)
+{
+	SoftwareMixerBackend_UnlockMixerMutex();
 }

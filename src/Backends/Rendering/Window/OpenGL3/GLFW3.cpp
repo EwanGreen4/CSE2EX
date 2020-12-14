@@ -1,3 +1,6 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "../OpenGL.h"
 
 #include <stddef.h>
@@ -12,7 +15,7 @@
 
 GLFWwindow *window;
 
-bool WindowBackend_OpenGL_CreateWindow(const char *window_title, int *screen_width, int *screen_height, bool fullscreen, bool vsync)
+bool WindowBackend_OpenGL_CreateWindow(const char *window_title, size_t *screen_width, size_t *screen_height, bool fullscreen, bool vsync)
 {
 #ifdef USE_OPENGLES2
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
@@ -34,6 +37,8 @@ bool WindowBackend_OpenGL_CreateWindow(const char *window_title, int *screen_wid
 
 		if (monitor != NULL)
 		{
+			// Use current monitor resolution, because for some reason
+			// 640x480 causes my laptop to completely freeze on Linux.
 			const GLFWvidmode *mode = glfwGetVideoMode(monitor);
 
 			*screen_width = mode->width;
@@ -47,31 +52,30 @@ bool WindowBackend_OpenGL_CreateWindow(const char *window_title, int *screen_wid
 	{
 		glfwMakeContextCurrent(window);
 
-			#ifndef USE_OPENGLES2
-				if (gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-				{
-					// Check if the platform supports OpenGL 3.2
-					if (GLAD_GL_VERSION_3_2)
-					{
-			#endif
-						if (vsync)
-							glfwSwapInterval(1);
+	#ifndef USE_OPENGLES2
+		if (gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+		{
+			// Check if the platform supports OpenGL 3.2
+			if (GLAD_GL_VERSION_3_2)
+			{
+	#endif
+				glfwSwapInterval(vsync ? 1 : 0);	// Set vsync
 
-						Backend_PostWindowCreation();
+				Backend_PostWindowCreation();
 
-						return true;
-			#ifndef USE_OPENGLES2
-					}
-					else
-					{
-						Backend_ShowMessageBox("Fatal error (OpenGL rendering backend)", "Your system does not support OpenGL 3.2");
-					}
-				}
-				else
-				{
-					Backend_ShowMessageBox("Fatal error (OpenGL rendering backend)", "Could not initialize OpenGL context");
-				}
-			#endif
+				return true;
+	#ifndef USE_OPENGLES2
+			}
+			else
+			{
+				Backend_ShowMessageBox("Fatal error (OpenGL rendering backend)", "Your system does not support OpenGL 3.2");
+			}
+		}
+		else
+		{
+			Backend_ShowMessageBox("Fatal error (OpenGL rendering backend)", "Could not initialize OpenGL context");
+		}
+	#endif
 
 		glfwDestroyWindow(window);
 	}

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -414,7 +421,7 @@ void ActNpc141(NPCHAR *npc)
 			{
 				npc->act_no = 20;
 				npc->act_wait = 0;
-				SetCaret(npc->x, npc->y, 2, 0);
+				SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 				PlaySoundObject(12, SOUND_MODE_PLAY);
 
 				for (i = 0; i < 4; ++i)
@@ -729,7 +736,7 @@ void ActNpc146(NPCHAR *npc)
 			npc->act_no = 1;
 
 			if (npc->direct == 2)
-				SetFlash(0, 0, 2);
+				SetFlash(0, 0, FLASH_MODE_FLASH);
 			// Fallthrough
 		case 1:
 			if (++npc->act_wait > 10)
@@ -754,7 +761,7 @@ void ActNpc146(NPCHAR *npc)
 			{
 				SetDestroyNpChar(npc->x, npc->y, 0x1000, 8);
 				npc->cond = 0;
-			#ifdef FIX_BUGS
+			#ifdef FIX_MAJOR_BUGS
 				return;	// The code below will use 'ani_no' to access 'rect', even though it's now too high
 			#endif
 			}
@@ -953,7 +960,7 @@ void ActNpc148(NPCHAR *npc)
 {
 	if (npc->flag & 0xFF)
 	{
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 		npc->cond = 0;
 	}
 
@@ -972,7 +979,7 @@ void ActNpc148(NPCHAR *npc)
 
 	if (++npc->count1 > 300)
 	{
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 		npc->cond = 0;
 	}
 }
@@ -1739,7 +1746,7 @@ void ActNpc156(NPCHAR *npc)
 {
 	if (npc->flag & 0xFF)
 	{
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 		npc->cond = 0;
 	}
 
@@ -1759,7 +1766,7 @@ void ActNpc156(NPCHAR *npc)
 
 	if (++npc->count1 > 300)
 	{
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 		npc->cond = 0;
 	}
 }
@@ -1961,7 +1968,7 @@ void ActNpc158(NPCHAR *npc)
 	if (++npc->ani_wait > 2)
 	{
 		npc->ani_wait = 0;
-		SetCaret(npc->x, npc->y, 7, 4);
+		SetCaret(npc->x, npc->y, CARET_EXHAUST, DIR_AUTO);
 	}
 
 	npc->ani_no = (npc->count1 + 0x10) / 0x20;

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "GenericLoad.h"
 
 #include <stdio.h>
@@ -236,16 +243,16 @@ BOOL LoadGenericData(void)
 	if (bError)
 		return FALSE;
 
-	MakeSurface_Generic(WINDOW_WIDTH, WINDOW_HEIGHT, SURFACE_ID_SCREEN_GRAB, TRUE);
-	MakeSurface_Generic(320, 240, SURFACE_ID_LEVEL_BACKGROUND, FALSE);
-	MakeSurface_Generic(WINDOW_WIDTH, WINDOW_HEIGHT, SURFACE_ID_MAP, TRUE);
-	MakeSurface_Generic(320, 240, SURFACE_ID_CASTS, FALSE);
-	MakeSurface_Generic(256, 256, SURFACE_ID_LEVEL_TILESET, FALSE);
-	MakeSurface_Generic(160, 16, SURFACE_ID_ROOM_NAME, FALSE);
-	MakeSurface_Generic(40, 240, SURFACE_ID_VALUE_VIEW, FALSE);
-	MakeSurface_Generic(320, 240, SURFACE_ID_LEVEL_SPRITESET_1, FALSE);
-	MakeSurface_Generic(320, 240, SURFACE_ID_LEVEL_SPRITESET_2, FALSE);
-	MakeSurface_Generic(320, 16 * (MAX_STRIP - 1), SURFACE_ID_CREDIT_CAST, FALSE);
+	MakeSurface_Generic(WINDOW_WIDTH, WINDOW_HEIGHT, SURFACE_ID_SCREEN_GRAB, TRUE, TRUE);
+	MakeSurface_Generic(320, 240, SURFACE_ID_LEVEL_BACKGROUND, FALSE, FALSE);
+	MakeSurface_Generic(WINDOW_WIDTH, WINDOW_HEIGHT, SURFACE_ID_MAP, TRUE, TRUE);
+	MakeSurface_Generic(320, 240, SURFACE_ID_CASTS, FALSE, FALSE);
+	MakeSurface_Generic(256, 256, SURFACE_ID_LEVEL_TILESET, FALSE, FALSE);
+	MakeSurface_Generic(160, 16, SURFACE_ID_ROOM_NAME, FALSE, TRUE);
+	MakeSurface_Generic(40, 240, SURFACE_ID_VALUE_VIEW, FALSE, TRUE);
+	MakeSurface_Generic(320, 240, SURFACE_ID_LEVEL_SPRITESET_1, FALSE, FALSE);
+	MakeSurface_Generic(320, 240, SURFACE_ID_LEVEL_SPRITESET_2, FALSE, FALSE);
+	MakeSurface_Generic(320, 16 * (MAX_STRIP - 1), SURFACE_ID_CREDIT_CAST, FALSE, TRUE);
 
 	pt_size = 0;
 
@@ -278,8 +285,12 @@ BOOL LoadGenericData(void)
 	}
 
 	// Commented-out, since ints *technically* have an undefined length
-	// char str[0x40];
-	// sprintf(str, "PixTone = %d byte", pt_size);
-	// There must have been some kind of console print function here or something
+/*
+	char str[0x40];
+	sprintf(str, "PixTone = %d byte", pt_size);
+	// There must have once been a 'OutputDebugStringA' call here or something.
+	// See 'EnumDevices_Callback' in 'Input.cpp' for an example of this.
+*/
+
 	return TRUE;
 }

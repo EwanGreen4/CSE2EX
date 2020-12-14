@@ -1,22 +1,29 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "../Misc.h"
 
-#include <chrono>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <string>
-#include <thread>
+
+#if __cplusplus >= 201103L
+	#include <chrono>
+	#include <thread>
+#elif defined(_WIN32)
+	#include "windows.h"
+#else
+	#include <unistd.h>
+#endif
 
 #include <GLFW/glfw3.h>
 
 #include "../Rendering.h"
 #include "../Shared/GLFW3.h"
 #include "../../Attributes.h"
-#include "../../Main.h"
-#include "../../Organya.h"
-#include "../../Profile.h"
 
 #define DO_KEY(GLFW_KEY, BACKEND_KEY) \
 	case GLFW_KEY: \
@@ -26,6 +33,9 @@
 static bool keyboard_state[BACKEND_KEYBOARD_TOTAL];
 
 static GLFWcursor* cursor;
+
+static void (*drag_and_drop_callback)(const char *path);
+static void (*window_focus_callback)(bool focus);
 
 static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
@@ -127,10 +137,7 @@ static void WindowFocusCallback(GLFWwindow *window, int focused)
 {
 	(void)window;
 
-	if (focused)
-		ActiveWindow();
-	else
-		InactiveWindow();
+	window_focus_callback(focused);
 }
 
 static void WindowSizeCallback(GLFWwindow *window, int width, int height)
@@ -145,7 +152,7 @@ static void DragAndDropCallback(GLFWwindow *window, int count, const char **path
 	(void)window;
 	(void)count;
 
-	LoadProfile(paths[0]);
+	drag_and_drop_callback(paths[0]);
 }
 
 static void ErrorCallback(int code, const char *description)
@@ -153,8 +160,11 @@ static void ErrorCallback(int code, const char *description)
 	Backend_PrintError("GLFW error received (%d): %s", code, description);
 }
 
-bool Backend_Init(void)
+bool Backend_Init(void (*drag_and_drop_callback_param)(const char *path), void (*window_focus_callback_param)(bool focus))
 {
+	drag_and_drop_callback = drag_and_drop_callback_param;
+	window_focus_callback = window_focus_callback_param;
+
 	glfwSetErrorCallback(ErrorCallback);
 
 	if (glfwInit() == GL_TRUE)
@@ -181,9 +191,10 @@ void Backend_PostWindowCreation(void)
 	glfwSetWindowSizeCallback(window, WindowSizeCallback);
 }
 
-bool Backend_GetBasePath(std::string *string_buffer)
+bool Backend_GetPaths(std::string *module_path, std::string *data_path)
 {
-	(void)string_buffer;
+	(void)module_path;
+	(void)data_path;
 
 	// GLFW3 doesn't seem to have a mechanism for this
 	return false;
@@ -194,7 +205,7 @@ void Backend_HideMouse(void)
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 }
 
-void Backend_SetWindowIcon(const unsigned char *rgb_pixels, unsigned int width, unsigned int height)
+void Backend_SetWindowIcon(const unsigned char *rgb_pixels, size_t width, size_t height)
 {
 	// Convert to RGBA, since that's the only thing GLFW3 accepts
 	unsigned char *rgba_pixels = (unsigned char*)malloc(width * height * 4);
@@ -204,9 +215,9 @@ void Backend_SetWindowIcon(const unsigned char *rgb_pixels, unsigned int width, 
 
 	if (rgba_pixels != NULL)
 	{
-		for (unsigned int y = 0; y < height; ++y)
+		for (size_t y = 0; y < height; ++y)
 		{
-			for (unsigned int x = 0; x < width; ++x)
+			for (size_t x = 0; x < width; ++x)
 			{
 				*rgba_pointer++ = *rgb_pointer++;
 				*rgba_pointer++ = *rgb_pointer++;
@@ -222,7 +233,7 @@ void Backend_SetWindowIcon(const unsigned char *rgb_pixels, unsigned int width, 
 	}
 }
 
-void Backend_SetCursor(const unsigned char *rgba_pixels, unsigned int width, unsigned int height)
+void Backend_SetCursor(const unsigned char *rgba_pixels, size_t width, size_t height)
 {
 	GLFWimage glfw_image = {(int)width, (int)height, (unsigned char*)rgba_pixels};
 	cursor = glfwCreateCursor(&glfw_image, 0, 0);
@@ -231,7 +242,7 @@ void Backend_SetCursor(const unsigned char *rgba_pixels, unsigned int width, uns
 		glfwSetCursor(window, cursor);
 }
 
-void PlaybackBackend_EnableDragAndDrop(void)
+void Backend_EnableDragAndDrop(void)
 {
 	glfwSetDropCallback(window, DragAndDropCallback);
 }
@@ -239,10 +250,7 @@ void PlaybackBackend_EnableDragAndDrop(void)
 bool Backend_SystemTask(bool active)
 {
 	if (glfwWindowShouldClose(window))
-	{
-		StopOrganyaMusic();
 		return false;
-	}
 
 	if (active)
 		glfwPollEvents();
@@ -260,7 +268,7 @@ void Backend_GetKeyboardState(bool *out_keyboard_state)
 void Backend_ShowMessageBox(const char *title, const char *message)
 {
 	// GLFW3 doesn't have a message box
-	printf("ShowMessageBox - '%s' - '%s'\n", title, message);
+	Backend_PrintInfo("ShowMessageBox - '%s' - '%s'\n", title, message);
 }
 
 ATTRIBUTE_FORMAT_PRINTF(1, 2) void Backend_PrintError(const char *format, ...)
@@ -278,8 +286,8 @@ ATTRIBUTE_FORMAT_PRINTF(1, 2) void Backend_PrintInfo(const char *format, ...)
 	va_list argumentList;
 	va_start(argumentList, format);
 	fputs("INFO: ", stdout);
-	vprintf(format, argumentList);
-	putchar('\n');
+	vfprintf(stdout, format, argumentList);
+	fputc('\n', stdout);
 	va_end(argumentList);
 }
 
@@ -290,8 +298,14 @@ unsigned long Backend_GetTicks(void)
 
 void Backend_Delay(unsigned int ticks)
 {
+#if __cplusplus >= 201103L
 	// GLFW3 doesn't have a delay function, so here's some butt-ugly C++11
 	std::this_thread::sleep_for(std::chrono::milliseconds(ticks));
+#elif defined(_WIN32)
+	Sleep(ticks);
+#else
+	usleep(ticks * 1000);
+#endif
 }
 
 void Backend_GetDisplayMode(Backend_DisplayMode *display_mode)
@@ -303,9 +317,4 @@ void Backend_GetDisplayMode(Backend_DisplayMode *display_mode)
 	display_mode->width = mode->width;
 	display_mode->height = mode->height;
 	display_mode->refresh_rate = mode->refreshRate;
-}
-
-bool Backend_IsConsole(void)
-{
-	return false;
 }

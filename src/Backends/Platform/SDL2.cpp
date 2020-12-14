@@ -1,3 +1,6 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "../Misc.h"
 
 #include <stdarg.h>
@@ -10,11 +13,8 @@
 #include "SDL.h"
 
 #include "../Rendering.h"
-#include "../Shared/SDL2.h"
+#include "../Shared/SDL.h"
 #include "../../Attributes.h"
-#include "../../Main.h"
-#include "../../Organya.h"
-#include "../../Profile.h"
 
 #define DO_KEY(SDL_KEY, BACKEND_KEY) \
 	case SDL_KEY: \
@@ -27,8 +27,14 @@ static unsigned char *cursor_surface_pixels;
 static SDL_Surface *cursor_surface;
 static SDL_Cursor *cursor;
 
-bool Backend_Init(void)
+static void (*drag_and_drop_callback)(const char *path);
+static void (*window_focus_callback)(bool focus);
+
+bool Backend_Init(void (*drag_and_drop_callback_param)(const char *path), void (*window_focus_callback_param)(bool focus))
 {
+	drag_and_drop_callback = drag_and_drop_callback_param;
+	window_focus_callback = window_focus_callback_param;
+
 	if (SDL_Init(SDL_INIT_EVENTS) == 0)
 	{
 		if (SDL_InitSubSystem(SDL_INIT_VIDEO) == 0)
@@ -86,14 +92,15 @@ void Backend_PostWindowCreation(void)
 	
 }
 
-bool Backend_GetBasePath(std::string *string_buffer)
+bool Backend_GetPaths(std::string *module_path, std::string *data_path)
 {
 #ifdef _WIN32
 	// SDL_GetBasePath returns a UTF-8 string, but Windows' fopen uses (extended?) ASCII.
 	// This is apparently a problem for accented characters, as they will make fopen fail.
 	// So, instead, we rely on argv[0], as that will put the accented characters in a
 	// format Windows will understand.
-	(void)string_buffer;
+	(void)module_path;
+	(void)data_path;
 
 	return false;
 #else
@@ -104,8 +111,10 @@ bool Backend_GetBasePath(std::string *string_buffer)
 	// Trim the trailing '/'
 	size_t base_path_length = strlen(base_path);
 	base_path[base_path_length - 1] = '\0';
-	*string_buffer = base_path;
+	*module_path = base_path;
 	SDL_free(base_path);
+
+	*data_path = *module_path + "/data";
 
 	return true;
 #endif
@@ -116,7 +125,7 @@ void Backend_HideMouse(void)
 	SDL_ShowCursor(SDL_DISABLE);
 }
 
-void Backend_SetWindowIcon(const unsigned char *rgb_pixels, unsigned int width, unsigned int height)
+void Backend_SetWindowIcon(const unsigned char *rgb_pixels, size_t width, size_t height)
 {
 	SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormatFrom((void*)rgb_pixels, width, height, 0, width * 3, SDL_PIXELFORMAT_RGB24);
 
@@ -131,7 +140,7 @@ void Backend_SetWindowIcon(const unsigned char *rgb_pixels, unsigned int width, 
 	}
 }
 
-void Backend_SetCursor(const unsigned char *rgba_pixels, unsigned int width, unsigned int height)
+void Backend_SetCursor(const unsigned char *rgba_pixels, size_t width, size_t height)
 {
 	cursor_surface_pixels = (unsigned char*)malloc(width * height * 4);
 
@@ -155,7 +164,7 @@ void Backend_SetCursor(const unsigned char *rgba_pixels, unsigned int width, uns
 	}
 }
 
-void PlaybackBackend_EnableDragAndDrop(void)
+void Backend_EnableDragAndDrop(void)
 {
 	SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 }
@@ -267,7 +276,7 @@ bool Backend_SystemTask(bool active)
 				break;
 
 			case SDL_DROPFILE:
-				LoadProfile(event.drop.file);
+				drag_and_drop_callback(event.drop.file);
 				SDL_free(event.drop.file);
 				break;
 
@@ -275,11 +284,11 @@ bool Backend_SystemTask(bool active)
 				switch (event.window.event)
 				{
 					case SDL_WINDOWEVENT_FOCUS_LOST:
-						InactiveWindow();
+						window_focus_callback(false);
 						break;
 
 					case SDL_WINDOWEVENT_FOCUS_GAINED:
-						ActiveWindow();
+						window_focus_callback(true);
 						break;
 
 					case SDL_WINDOWEVENT_RESIZED:
@@ -291,7 +300,6 @@ bool Backend_SystemTask(bool active)
 				break;
 
 			case SDL_QUIT:
-				StopOrganyaMusic();
 				return false;
 
 			case SDL_RENDER_TARGETS_RESET:
@@ -311,7 +319,7 @@ void Backend_GetKeyboardState(bool *out_keyboard_state)
 
 void Backend_ShowMessageBox(const char *title, const char *message)
 {
-	fprintf(stderr, "ShowMessageBox - '%s' - '%s'\n", title, message);
+	Backend_PrintInfo("ShowMessageBox - '%s' - '%s'\n", title, message);
 
 	if (SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, message, window) != 0)
 		Backend_PrintError("Was also unable to display a message box containing the error: %s", SDL_GetError());
@@ -332,8 +340,8 @@ ATTRIBUTE_FORMAT_PRINTF(1, 2) void Backend_PrintInfo(const char *format, ...)
 	va_list argumentList;
 	va_start(argumentList, format);
 	fputs("INFO: ", stdout);
-	vprintf(format, argumentList);
-	putchar('\n');
+	vfprintf(stdout, format, argumentList);
+	fputc('\n', stdout);
 	va_end(argumentList);
 }
 
@@ -355,9 +363,4 @@ void Backend_GetDisplayMode(Backend_DisplayMode *display_mode)
 	display_mode->width = sdl_display_mode.w;
 	display_mode->height = sdl_display_mode.h;
 	display_mode->refresh_rate = sdl_display_mode.refresh_rate;
-}
-
-bool Backend_IsConsole(void)
-{
-	return false;
 }

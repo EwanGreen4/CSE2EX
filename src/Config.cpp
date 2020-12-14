@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,10 +20,10 @@
 const char* const gConfigName = "ConfigCSE2E.dat";
 const char* const gProof = "CSE2E   20200430";
 
-BOOL LoadConfigData(CONFIG *conf)
+BOOL LoadConfigData(CONFIGDATA *conf)
 {
 	// Clear old configuration data
-	memset(conf, 0, sizeof(CONFIG));
+	memset(conf, 0, sizeof(CONFIGDATA));
 
 	// Get path
 	std::string path = gModulePath + '/' + gConfigName;
@@ -58,14 +65,14 @@ BOOL LoadConfigData(CONFIG *conf)
 	// Check if version is not correct, and return if it failed
 	if (strcmp(conf->proof, gProof))
 	{
-		memset(conf, 0, sizeof(CONFIG));
+		memset(conf, 0, sizeof(CONFIGDATA));
 		return FALSE;
 	}
 
 	return TRUE;
 }
 
-BOOL SaveConfigData(const CONFIG *conf)
+BOOL SaveConfigData(const CONFIGDATA *conf)
 {
 	// Get path
 	std::string path = gModulePath + '/' + gConfigName;
@@ -107,15 +114,21 @@ BOOL SaveConfigData(const CONFIG *conf)
 	return TRUE;
 }
 
-void DefaultConfigData(CONFIG *conf)
+void DefaultConfigData(CONFIGDATA *conf)
 {
 	// Clear old configuration data
-	memset(conf, 0, sizeof(CONFIG));
+	memset(conf, 0, sizeof(CONFIGDATA));
 
 	strcpy(conf->proof, gProof);
 
 	// Fun fact: The Linux port added this line:
 	// conf->display_mode = 1;
+
+#ifdef _3DS
+	conf->display_mode = 1;
+#elif defined(__riscos__)
+	conf->display_mode = 2;
+#endif
 
 	// Reset joystick settings (as these can't simply be set to 0)
 	conf->bindings[BINDING_UP].controller = 7;

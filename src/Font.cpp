@@ -1,37 +1,64 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "Font.h"
 
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_BITMAP_H
+#ifdef FREETYPE_FONTS
+	#include <ft2build.h>
+	#include FT_FREETYPE_H
+	#include FT_BITMAP_H
+#endif
 
+#include "Bitmap.h"
 #include "File.h"
 #include "Backends/Rendering.h"
 
-// Uncomment for that authentic pre-Windows Vista feel
-//#define DISABLE_FONT_ANTIALIASING
+// This controls however many glyphs (letters) the game can cache in VRAM at once
+#define TOTAL_GLYPH_SLOTS 256
 
-typedef struct CachedGlyph
+typedef struct Glyph
 {
 	unsigned long unicode_value;
-	int x;
-	int y;
-	int x_advance;
-	RenderBackend_Glyph *backend;
 
-	struct CachedGlyph *next;
-} CachedGlyph;
+	size_t x;
+	size_t y;
 
-typedef struct FontObject
+	size_t width;
+	size_t height;
+
+	size_t x_offset;
+	size_t y_offset;
+
+	size_t x_advance;
+
+	struct Glyph *next;
+} Glyph;
+
+typedef struct Font
 {
+#ifdef FREETYPE_FONTS
 	FT_Library library;
 	FT_Face face;
 	unsigned char *data;
-	CachedGlyph *glyph_list_head;
-} FontObject;
+	bool antialiasing;
+#else
+	unsigned char *image_buffer;
+	size_t image_buffer_width;
+	size_t image_buffer_height;
+	size_t glyph_slot_width;
+	size_t glyph_slot_height;
+	size_t total_local_glyphs;
+	Glyph *local_glyphs;
+#endif
+	Glyph glyphs[TOTAL_GLYPH_SLOTS];
+	Glyph *glyph_list_head;
+	RenderBackend_GlyphAtlas *atlas;
+} Font;
 
 #ifdef JAPANESE
 static const unsigned short shiftjis_to_unicode_lookup[0x3100] = {
@@ -821,7 +848,7 @@ static const unsigned short shiftjis_to_unicode_lookup[0x3100] = {
 	0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020
 };
 
-static unsigned short ShiftJISToUnicode(const unsigned char *string, unsigned int *bytes_read)
+static unsigned short ShiftJISToUTF32(const unsigned char *string, size_t *bytes_read)
 {
 	size_t lookup_index;
 
@@ -854,9 +881,33 @@ static unsigned short ShiftJISToUnicode(const unsigned char *string, unsigned in
 
 #else
 
-static unsigned long UTF8ToUnicode(const unsigned char *string, unsigned int *bytes_read)
+static const unsigned short cp1252_to_unicode_lookup[0x100] = {
+	0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007, 0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x000F,
+	0x0010, 0x0011, 0x0012, 0x0013, 0x0014, 0x0015, 0x0016, 0x0017, 0x0018, 0x0019, 0x001A, 0x001B, 0x001C, 0x001D, 0x001E, 0x001F,
+	0x0020, 0x0021, 0x0022, 0x0023, 0x0024, 0x0025, 0x0026, 0x0027, 0x0028, 0x0029, 0x002A, 0x002B, 0x002C, 0x002D, 0x002E, 0x002F,
+	0x0030, 0x0031, 0x0032, 0x0033, 0x0034, 0x0035, 0x0036, 0x0037, 0x0038, 0x0039, 0x003A, 0x003B, 0x003C, 0x003D, 0x003E, 0x003F,
+	0x0040, 0x0041, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046, 0x0047, 0x0048, 0x0049, 0x004A, 0x004B, 0x004C, 0x004D, 0x004E, 0x004F,
+	0x0050, 0x0051, 0x0052, 0x0053, 0x0054, 0x0055, 0x0056, 0x0057, 0x0058, 0x0059, 0x005A, 0x005B, 0x005C, 0x005D, 0x005E, 0x005F,
+	0x0060, 0x0061, 0x0062, 0x0063, 0x0064, 0x0065, 0x0066, 0x0067, 0x0068, 0x0069, 0x006A, 0x006B, 0x006C, 0x006D, 0x006E, 0x006F,
+	0x0070, 0x0071, 0x0072, 0x0073, 0x0074, 0x0075, 0x0076, 0x0077, 0x0078, 0x0079, 0x007A, 0x007B, 0x007C, 0x007D, 0x007E, 0x007F,
+	0x20AC, 0x0020, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x0020, 0x017D, 0x0020,
+	0x0020, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x0020, 0x017E, 0x0178,
+	0x00A0, 0x00A1, 0x00A2, 0x00A3, 0x00A4, 0x00A5, 0x00A6, 0x00A7, 0x00A8, 0x00A9, 0x00AA, 0x00AB, 0x00AC, 0x00AD, 0x00AE, 0x00AF,
+	0x00B0, 0x00B1, 0x00B2, 0x00B3, 0x00B4, 0x00B5, 0x00B6, 0x00B7, 0x00B8, 0x00B9, 0x00BA, 0x00BB, 0x00BC, 0x00BD, 0x00BE, 0x00BF,
+	0x00C0, 0x00C1, 0x00C2, 0x00C3, 0x00C4, 0x00C5, 0x00C6, 0x00C7, 0x00C8, 0x00C9, 0x00CA, 0x00CB, 0x00CC, 0x00CD, 0x00CE, 0x00CF,
+	0x00D0, 0x00D1, 0x00D2, 0x00D3, 0x00D4, 0x00D5, 0x00D6, 0x00D7, 0x00D8, 0x00D9, 0x00DA, 0x00DB, 0x00DC, 0x00DD, 0x00DE, 0x00DF,
+	0x00E0, 0x00E1, 0x00E2, 0x00E3, 0x00E4, 0x00E5, 0x00E6, 0x00E7, 0x00E8, 0x00E9, 0x00EA, 0x00EB, 0x00EC, 0x00ED, 0x00EE, 0x00EF,
+	0x00F0, 0x00F1, 0x00F2, 0x00F3, 0x00F4, 0x00F5, 0x00F6, 0x00F7, 0x00F8, 0x00F9, 0x00FA, 0x00FB, 0x00FC, 0x00FD, 0x00FE, 0x00FF
+};
+
+// This was used before we knew the original EXE was actually using CP1252.
+// This function might be useful for mods and future translations, so I've left it here.
+
+/*
+static unsigned long UTF8ToUTF32(const unsigned char *string, size_t *bytes_read)
 {
-	unsigned int length;
+	// TODO - check for well-formedness
+	size_t length;
 	unsigned long charcode;
 
 	unsigned int zero_bit = 0;
@@ -907,6 +958,7 @@ static unsigned long UTF8ToUnicode(const unsigned char *string, unsigned int *by
 
 	return charcode;
 }
+*/
 #endif
 
 static unsigned char GammaCorrect(unsigned char value)
@@ -939,209 +991,372 @@ static unsigned char GammaCorrect(unsigned char value)
 	return lookup[value];
 }
 
-static CachedGlyph* GetGlyphCached(FontObject *font_object, unsigned long unicode_value)
+static Glyph* GetGlyph(Font *font, unsigned long unicode_value)
 {
-	CachedGlyph *glyph;
+	Glyph **glyph_pointer = &font->glyph_list_head;
+	Glyph *glyph;
 
-	for (glyph = font_object->glyph_list_head; glyph != NULL; glyph = glyph->next)
+	for (;;)
+	{
+		glyph = *glyph_pointer;
+
 		if (glyph->unicode_value == unicode_value)
+		{
+			// Move it to the front of the list
+			*glyph_pointer = glyph->next;
+			glyph->next = font->glyph_list_head;
+			font->glyph_list_head = glyph;
+
 			return glyph;
+		}
 
-	glyph = (CachedGlyph*)malloc(sizeof(CachedGlyph));
+		if (glyph->next == NULL)
+			break;
 
-	if (glyph != NULL)
+		glyph_pointer = &glyph->next;
+	}
+
+	// Couldn't find glyph - overwrite the old one at the end.
+	// The one at the end hasn't been used in a while anyway.
+
+#ifdef FREETYPE_FONTS
+	unsigned int glyph_index = FT_Get_Char_Index(font->face, unicode_value);
+
+	if (FT_Load_Glyph(font->face, glyph_index, FT_LOAD_RENDER | (font->antialiasing ? 0 : FT_LOAD_TARGET_MONO)) == 0)
 	{
-		unsigned int glyph_index = FT_Get_Char_Index(font_object->face, unicode_value);
+		FT_Bitmap bitmap;
+		FT_Bitmap_New(&bitmap);
 
-#ifndef DISABLE_FONT_ANTIALIASING
-		if (FT_Load_Glyph(font_object->face, glyph_index, FT_LOAD_RENDER) == 0)
-#else
-		if (FT_Load_Glyph(font_object->face, glyph_index, FT_LOAD_RENDER | FT_LOAD_MONOCHROME | FT_LOAD_TARGET_MONO) == 0)
-#endif
+		if (FT_Bitmap_Convert(font->library, &font->face->glyph->bitmap, &bitmap, 1) == 0)
 		{
+			switch (font->face->glyph->bitmap.pixel_mode)
+			{
+				case FT_PIXEL_MODE_GRAY:
+					for (size_t y = 0; y < bitmap.rows; ++y)
+					{
+						unsigned char *pixel_pointer = &bitmap.buffer[y * bitmap.pitch];
+
+						for (size_t x = 0; x < bitmap.width; ++x)
+						{
+							*pixel_pointer = GammaCorrect((*pixel_pointer * 0xFF) / (bitmap.num_grays - 1));
+							++pixel_pointer;
+						}
+					}
+
+					break;
+
+				case FT_PIXEL_MODE_MONO:
+					for (size_t y = 0; y < bitmap.rows; ++y)
+					{
+						unsigned char *pixel_pointer = &bitmap.buffer[y * bitmap.pitch];
+
+						for (size_t x = 0; x < bitmap.width; ++x)
+						{
+							*pixel_pointer = *pixel_pointer ? 0xFF : 0;
+							++pixel_pointer;
+						}
+					}
+
+					break;
+			}
+
 			glyph->unicode_value = unicode_value;
-			glyph->x = font_object->face->glyph->bitmap_left;
-			glyph->y = (FT_MulFix(font_object->face->ascender, font_object->face->size->metrics.y_scale) - font_object->face->glyph->metrics.horiBearingY + (64 / 2)) / 64;
-			glyph->x_advance = font_object->face->glyph->advance.x / 64;
+			glyph->width = bitmap.width;
+			glyph->height = bitmap.rows;
+			glyph->x_offset = font->face->glyph->bitmap_left;
+			glyph->y_offset = (font->face->size->metrics.ascender + (64 / 2)) / 64 - font->face->glyph->bitmap_top;
+			glyph->x_advance = font->face->glyph->advance.x / 64;
 
-			FT_Bitmap bitmap;
-			FT_Bitmap_New(&bitmap);
+			if (glyph->width != 0 && glyph->height != 0)	// Some glyphs are just plain empty - don't bother trying to upload them
+				RenderBackend_UploadGlyph(font->atlas, glyph->x, glyph->y, bitmap.buffer, glyph->width, glyph->height, glyph->width);
 
-			if (FT_Bitmap_Convert(font_object->library, &font_object->face->glyph->bitmap, &bitmap, 1) == 0)
-			{
-				switch (font_object->face->glyph->bitmap.pixel_mode)
-				{
-					case FT_PIXEL_MODE_GRAY:
-						for (unsigned int y = 0; y < bitmap.rows; ++y)
-						{
-							unsigned char *pixel_pointer = bitmap.buffer + y * bitmap.pitch;
+			FT_Bitmap_Done(font->library, &bitmap);
 
-							for (unsigned int x = 0; x < bitmap.width; ++x)
-							{
-								*pixel_pointer = GammaCorrect((*pixel_pointer * 0xFF) / (bitmap.num_grays - 1));
-								++pixel_pointer;
-							}
-						}
+			*glyph_pointer = glyph->next;
+			glyph->next = font->glyph_list_head;
+			font->glyph_list_head = glyph;
 
-						break;
-
-					case FT_PIXEL_MODE_MONO:
-						for (unsigned int y = 0; y < bitmap.rows; ++y)
-						{
-							unsigned char *pixel_pointer = bitmap.buffer + y * bitmap.pitch;
-
-							for (unsigned int x = 0; x < bitmap.width; ++x)
-							{
-								*pixel_pointer = *pixel_pointer ? 0xFF : 0;
-								++pixel_pointer;
-							}
-						}
-
-						break;
-				}
-
-				// Don't bother loading glyphs that don't have an image (causes `cute_spritebatch.h` to freak-out)
-				if (bitmap.width == 0 || bitmap.rows == 0)
-					glyph->backend = NULL;
-				else
-					glyph->backend = RenderBackend_LoadGlyph(bitmap.buffer, bitmap.width, bitmap.rows, bitmap.pitch);
-
-				FT_Bitmap_Done(font_object->library, &bitmap);
-
-				glyph->next = font_object->glyph_list_head;
-				font_object->glyph_list_head = glyph;
-
-				return glyph;
-			}
-
-			FT_Bitmap_Done(font_object->library, &bitmap);
+			return glyph;
 		}
 
-		free(glyph);
+		FT_Bitmap_Done(font->library, &bitmap);
 	}
+#else
+	// Perform a binary search for the glyph
+	size_t left = 0;
+	size_t right = font->total_local_glyphs;
+
+	while (right - left >= 2)
+	{
+		const size_t index = (left + right) / 2;
+
+		if (font->local_glyphs[index].unicode_value > unicode_value)
+			right = index;
+		else
+			left = index;
+	}
+
+	if (font->local_glyphs[left].unicode_value == unicode_value)
+	{
+		const Glyph *local_glyph = &font->local_glyphs[left];
+
+		glyph->unicode_value = local_glyph->unicode_value;
+		glyph->width = font->glyph_slot_width;
+		glyph->height = font->glyph_slot_height;
+		glyph->x_offset = 0;
+		glyph->y_offset = 0;
+		glyph->x_advance = local_glyph->x_advance;
+
+		if (glyph->width != 0 && glyph->height != 0)	// Some glyphs are just plain empty - don't bother trying to upload them
+			RenderBackend_UploadGlyph(font->atlas, glyph->x, glyph->y, &font->image_buffer[local_glyph->y * font->image_buffer_width + local_glyph->x], glyph->width, glyph->height, font->image_buffer_width);
+
+		*glyph_pointer = glyph->next;
+		glyph->next = font->glyph_list_head;
+		font->glyph_list_head = glyph;
+
+		return glyph;
+	}
+#endif
 
 	return NULL;
 }
 
-static void UnloadCachedGlyphs(FontObject *font_object)
+#ifdef FREETYPE_FONTS
+Font* LoadFreeTypeFontFromData(const unsigned char *data, size_t data_size, size_t cell_width, size_t cell_height, bool antialiasing)
 {
-	CachedGlyph *glyph = font_object->glyph_list_head;
-	while (glyph != NULL)
+	Font *font = (Font*)malloc(sizeof(Font));
+
+	if (font != NULL)
 	{
-		CachedGlyph *next_glyph = glyph->next;
-
-		if (glyph->backend != NULL)
-			RenderBackend_UnloadGlyph(glyph->backend);
-
-		free(glyph);
-
-		glyph = next_glyph;
-	}
-
-	font_object->glyph_list_head = NULL;
-}
-
-FontObject* LoadFontFromData(const unsigned char *data, size_t data_size, unsigned int cell_width, unsigned int cell_height)
-{
-	FontObject *font_object = (FontObject*)malloc(sizeof(FontObject));
-
-	if (font_object != NULL)
-	{
-		if (FT_Init_FreeType(&font_object->library) == 0)
+		if (FT_Init_FreeType(&font->library) == 0)
 		{
-			font_object->data = (unsigned char*)malloc(data_size);
+			font->data = (unsigned char*)malloc(data_size);
 
-			if (font_object->data != NULL)
+			if (font->data != NULL)
 			{
-				memcpy(font_object->data, data, data_size);
+				memcpy(font->data, data, data_size);
 
-				if (FT_New_Memory_Face(font_object->library, font_object->data, (FT_Long)data_size, 0, &font_object->face) == 0)
+				if (FT_New_Memory_Face(font->library, font->data, (FT_Long)data_size, 0, &font->face) == 0)
 				{
-					FT_Set_Pixel_Sizes(font_object->face, cell_width, cell_height);
+					// Select a rough size, for vector glyphs
+					FT_Size_RequestRec request;
+					request.type = FT_SIZE_REQUEST_TYPE_CELL;
+					request.width = cell_height << 6;	// 'cell_height << 6' isn't a typo: it's needed by the Japanese font
+					request.height = cell_height << 6;
+					request.horiResolution = 0;
+					request.vertResolution = 0;
+					FT_Request_Size(font->face, &request);
 
-					font_object->glyph_list_head = NULL;
+					// If an accurate bitmap font is available, however, use that instead
+					for (FT_Int i = 0; i < font->face->num_fixed_sizes; ++i)
+					{
+						if (font->face->available_sizes[i].width == cell_width && font->face->available_sizes[i].height == cell_height)
+						{
+							FT_Select_Size(font->face, i);
+							break;
+						}
+					}
 
-					return font_object;
+					font->glyph_list_head = NULL;
+
+					size_t atlas_entry_width = FT_MulFix(font->face->bbox.xMax - font->face->bbox.xMin + 1, font->face->size->metrics.x_scale) / 64;
+					size_t atlas_entry_height = FT_MulFix(font->face->bbox.yMax - font->face->bbox.yMin + 1, font->face->size->metrics.y_scale) / 64;
+
+					size_t atlas_columns = ceil(sqrt(atlas_entry_width * atlas_entry_height * TOTAL_GLYPH_SLOTS) / atlas_entry_width);
+					size_t atlas_rows = (TOTAL_GLYPH_SLOTS + (atlas_columns - 1)) / atlas_columns;
+
+					font->atlas = RenderBackend_CreateGlyphAtlas(atlas_columns * atlas_entry_width, atlas_rows * atlas_entry_height);
+
+					if (font->atlas != NULL)
+					{
+						// Initialise the linked-list
+						for (size_t i = 0; i < TOTAL_GLYPH_SLOTS; ++i)
+						{
+							font->glyphs[i].next = (i == 0) ? NULL : &font->glyphs[i - 1];
+
+							font->glyphs[i].x = (i % atlas_columns) * atlas_entry_width;
+							font->glyphs[i].y = (i / atlas_columns) * atlas_entry_height;
+
+							font->glyphs[i].unicode_value = 0;
+						}
+
+						font->glyph_list_head = &font->glyphs[TOTAL_GLYPH_SLOTS - 1];
+
+						font->antialiasing = antialiasing;
+
+						return font;
+					}
+
+					FT_Done_Face(font->face);
 				}
 
-				free(font_object->data);
+				free(font->data);
 			}
 
-			FT_Done_FreeType(font_object->library);
+			FT_Done_FreeType(font->library);
 		}
 
-		free(font_object);
+		free(font);
 	}
 
 	return NULL;
 }
 
-FontObject* LoadFont(const char *font_filename, unsigned int cell_width, unsigned int cell_height)
+Font* LoadFreeTypeFont(const char *font_filename, size_t cell_width, size_t cell_height, bool antialiasing)
 {
-	FontObject *font_object = NULL;
+	Font *font = NULL;
 
 	size_t file_size;
 	unsigned char *file_buffer = LoadFileToMemory(font_filename, &file_size);
 
 	if (file_buffer != NULL)
 	{
-		font_object = LoadFontFromData(file_buffer, file_size, cell_width, cell_height);
+		font = LoadFreeTypeFontFromData(file_buffer, file_size, cell_width, cell_height, antialiasing);
 		free(file_buffer);
 	}
 
-	return font_object;
+	return font;
 }
-
-void DrawText(FontObject *font_object, RenderBackend_Surface *surface, int x, int y, unsigned long colour, const char *string)
+#else
+Font* LoadBitmapFont(const char *bitmap_path, const char *metadata_path)
 {
-	if (font_object != NULL && surface != NULL)
+	size_t bitmap_width, bitmap_height;
+	unsigned char *image_buffer = DecodeBitmapFromFile(bitmap_path, &bitmap_width, &bitmap_height, 1);
+
+	if (image_buffer != NULL)
 	{
-		const unsigned char colour_channels[3] = {(unsigned char)colour, (unsigned char)(colour >> 8), (unsigned char)(colour >> 16)};
+		size_t metadata_size;
+		unsigned char *metadata_buffer = LoadFileToMemory(metadata_path, &metadata_size);
 
-		RenderBackend_PrepareToDrawGlyphs(surface, colour_channels);
+		if (metadata_buffer != NULL)
+		{
+			Font *font = (Font*)malloc(sizeof(Font));
 
-		unsigned int pen_x = 0;
+			if (font != NULL)
+			{
+				font->glyph_slot_width = (metadata_buffer[0] << 8) | metadata_buffer[1];
+				font->glyph_slot_height = (metadata_buffer[2] << 8) | metadata_buffer[3];
+				font->total_local_glyphs = (metadata_buffer[4] << 8) | metadata_buffer[5];
 
-		const unsigned char *string_pointer = (unsigned char*)string;
-		const unsigned char *string_end = (unsigned char*)string + strlen(string);
+				font->local_glyphs = (Glyph*)malloc(sizeof(Glyph) * font->total_local_glyphs);
+
+				if (font->local_glyphs != NULL)
+				{
+					for (size_t i = 0; i < font->total_local_glyphs; ++i)
+					{
+						font->local_glyphs[i].unicode_value = (metadata_buffer[6 + i * 4 + 0] << 8) | metadata_buffer[6 + i * 4 + 1];
+
+						font->local_glyphs[i].x = (i % (bitmap_width / font->glyph_slot_width)) * font->glyph_slot_width;
+						font->local_glyphs[i].y = (i / (bitmap_width / font->glyph_slot_width)) * font->glyph_slot_height;
+
+						font->local_glyphs[i].width = font->glyph_slot_width;
+						font->local_glyphs[i].height = font->glyph_slot_height;
+
+						font->local_glyphs[i].x_offset = 0;
+						font->local_glyphs[i].y_offset = 0;
+
+						font->local_glyphs[i].x_advance = (metadata_buffer[6 + i * 4 + 2] << 8) | metadata_buffer[6 + i * 4 + 3];
+
+						font->local_glyphs[i].next = NULL;
+					}
+
+					size_t atlas_entry_width = font->glyph_slot_width;
+					size_t atlas_entry_height = font->glyph_slot_height;
+
+					size_t atlas_columns = ceil(sqrt(atlas_entry_width * atlas_entry_height * TOTAL_GLYPH_SLOTS) / atlas_entry_width);
+					size_t atlas_rows = (TOTAL_GLYPH_SLOTS + (atlas_columns - 1)) / atlas_columns;
+
+					font->atlas = RenderBackend_CreateGlyphAtlas(atlas_columns * atlas_entry_width, atlas_rows * atlas_entry_height);
+
+					if (font->atlas != NULL)
+					{
+						// Initialise the linked-list
+						for (size_t i = 0; i < TOTAL_GLYPH_SLOTS; ++i)
+						{
+							font->glyphs[i].next = (i == 0) ? NULL : &font->glyphs[i - 1];
+
+							font->glyphs[i].x = (i % atlas_columns) * atlas_entry_width;
+							font->glyphs[i].y = (i / atlas_columns) * atlas_entry_height;
+
+							font->glyphs[i].unicode_value = 0;
+						}
+
+						font->glyph_list_head = &font->glyphs[TOTAL_GLYPH_SLOTS - 1];
+
+						font->image_buffer = image_buffer;
+						font->image_buffer_width = bitmap_width;
+						font->image_buffer_height = bitmap_height;
+
+						free(metadata_buffer);
+
+						return font;
+					}
+				}
+
+				free(font);
+			}
+
+			free(metadata_buffer);
+		}
+
+		FreeBitmap(image_buffer);
+	}
+
+	return NULL;
+}
+#endif
+
+void DrawText(Font *font, RenderBackend_Surface *surface, int x, int y, unsigned long colour, const char *string)
+{
+	if (font != NULL && surface != NULL)
+	{
+		RenderBackend_PrepareToDrawGlyphs(font->atlas, surface, colour & 0xFF, (colour >> 8) & 0xFF, (colour >> 16) & 0xFF);
+
+		size_t pen_x = 0;
+
+		const unsigned char *string_pointer = (const unsigned char*)string;
+		const unsigned char *string_end = (const unsigned char*)string + strlen(string);
 
 		while (string_pointer != string_end)
 		{
-			unsigned int bytes_read;
-#ifdef JAPANESE
-			const unsigned short unicode_value = ShiftJISToUnicode(string_pointer, &bytes_read);
-#else
-			const unsigned long unicode_value = UTF8ToUnicode(string_pointer, &bytes_read);
-#endif
+		#ifdef JAPANESE
+			size_t bytes_read;
+			const unsigned short unicode_value = ShiftJISToUTF32(string_pointer, &bytes_read);
 			string_pointer += bytes_read;
+		#else
+			const unsigned short unicode_value = cp1252_to_unicode_lookup[*string_pointer++];
+		#endif
 
-			CachedGlyph *glyph = GetGlyphCached(font_object, unicode_value);
+			Glyph *glyph = GetGlyph(font, unicode_value);
 
 			if (glyph != NULL)
 			{
-				const int letter_x = x + pen_x + glyph->x;
-				const int letter_y = y + glyph->y;
+				const long letter_x = x + pen_x + glyph->x_offset;
+				const long letter_y = y + glyph->y_offset;
 
-				if (glyph->backend != NULL)
-					RenderBackend_DrawGlyph(glyph->backend, letter_x, letter_y);
+				RenderBackend_DrawGlyph(letter_x, letter_y, glyph->x, glyph->y, glyph->width, glyph->height);
 
 				pen_x += glyph->x_advance;
 			}
 		}
-
-		RenderBackend_FlushGlyphs();
 	}
 }
 
-void UnloadFont(FontObject *font_object)
+void UnloadFont(Font *font)
 {
-	if (font_object != NULL)
+	if (font != NULL)
 	{
-		UnloadCachedGlyphs(font_object);
+		RenderBackend_DestroyGlyphAtlas(font->atlas);
 
-		FT_Done_Face(font_object->face);
-		free(font_object->data);
-		FT_Done_FreeType(font_object->library);
-		free(font_object);
+	#ifdef FREETYPE_FONTS
+		FT_Done_Face(font->face);
+		free(font->data);
+		FT_Done_FreeType(font->library);
+	#else
+		free(font->local_glyphs);
+		FreeBitmap(font->image_buffer);
+	#endif
+
+		free(font);
 	}
 }

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpChar.h"
 
 #include <stddef.h>
@@ -9,6 +16,7 @@
 
 #include "ArmsItem.h"
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Draw.h"
 #include "File.h"
 #include "Flags.h"
@@ -70,7 +78,7 @@ BOOL LoadEvent(const char *path_event)
 	fread(code, 1, 4, fp);
 	if (memcmp(code, gPassPixEve, 3) != 0)
 	{
-#ifdef FIX_BUGS
+#ifdef FIX_MAJOR_BUGS
 		// The original game forgot to close the file here
 		fclose(fp);
 #endif
@@ -170,7 +178,7 @@ void SetDestroyNpChar(int x, int y, int w, int num)
 	}
 
 	// Flash effect
-	SetCaret(x, y, 12, 0);
+	SetCaret(x, y, CARET_EXPLOSION, DIR_LEFT);
 }
 
 void SetDestroyNpCharUp(int x, int y, int w, int num)
@@ -189,7 +197,7 @@ void SetDestroyNpCharUp(int x, int y, int w, int num)
 	}
 
 	// Flash effect
-	SetCaret(x, y, 12, 0);
+	SetCaret(x, y, CARET_EXPLOSION, DIR_LEFT);
 }
 
 void SetExpObjects(int x, int y, int exp)

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -5,6 +12,7 @@
 #include "WindowsWrapper.h"
 
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Frame.h"
 #include "Game.h"
 #include "Map.h"
@@ -1319,7 +1327,7 @@ void ActNpc268(NPCHAR *npc)
 			break;
 	}
 
-	npc->ym += 0x33;
+	npc->ym += 0x200 / 10;
 	if (npc->ym > 0x5FF)
 		npc->ym = 0x5FF;
 
@@ -1527,15 +1535,15 @@ void ActNpc271(NPCHAR *npc)
 	if (npc->ym < 0 && npc->y - npc->hit.top < 8 * 0x200)
 	{
 		npc->ym *= -1;
-		SetCaret(npc->x, npc->y - (8 * 0x200), 13, 0);
-		SetCaret(npc->x, npc->y - (8 * 0x200), 13, 0);
+		SetCaret(npc->x, npc->y - (8 * 0x200), CARET_TINY_PARTICLES, DIR_LEFT);
+		SetCaret(npc->x, npc->y - (8 * 0x200), CARET_TINY_PARTICLES, DIR_LEFT);
 	}
 
 	if (npc->ym > 0 && npc->y + npc->hit.bottom > 232 * 0x200)
 	{
 		npc->ym *= -1;
-		SetCaret(npc->x, npc->y + (8 * 0x200), 13, 0);
-		SetCaret(npc->x, npc->y + (8 * 0x200), 13, 0);
+		SetCaret(npc->x, npc->y + (8 * 0x200), CARET_TINY_PARTICLES, DIR_LEFT);
+		SetCaret(npc->x, npc->y + (8 * 0x200), CARET_TINY_PARTICLES, DIR_LEFT);
 	}
 
 	npc->x += npc->xm;

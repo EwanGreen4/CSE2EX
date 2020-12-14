@@ -1,8 +1,21 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "Draw.h"
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <string>
+
+#ifdef _3DS
+ #include <3ds.h>
+#endif
 
 #include "WindowsWrapper.h"
 
@@ -37,13 +50,16 @@ BOOL gb60fps;
 BOOL gbSmoothScrolling;
 BOOL gbVsync;
 
+size_t font_width;
+size_t font_height;
+
 static unsigned int vsync_fps;
 
 static RenderBackend_Surface *framebuffer;	// TODO - Not the original variable name
 
 static RenderBackend_Surface *surf[SURFACE_ID_MAX];
 
-static FontObject *font;	// TODO - Not the original variable name
+static Font *font;	// TODO - Not the original variable name
 
 // This doesn't exist in the Linux port, so none of these symbol names are accurate
 static struct
@@ -95,6 +111,14 @@ BOOL Flip_SystemTask(void)
 	}
 
 	RenderBackend_DrawScreen();
+
+#ifdef _3DS
+	// This would go in Backend_SystemTask, but that causes a hang
+	// because of a race condition: aptMainLoop cannot be called
+	// between C3D_FrameBegin and C3D_FrameEnd
+	if (!aptMainLoop())
+		return false;
+#endif
 
 	if (RestoreSurfaces())
 	{
@@ -186,39 +210,32 @@ void ReleaseSurface(SurfaceID s)
 	memset(&surface_metadata[s], 0, sizeof(surface_metadata[0]));
 }
 
-static BOOL ScaleAndUploadSurface(const unsigned char *image_buffer, int width, int height, SurfaceID surf_no)
+static BOOL ScaleAndUploadSurface(const unsigned char *image_buffer, size_t width, size_t height, SurfaceID surf_no)
 {
 	const int magnification_scaled = mag / SPRITE_SCALE;
-
-	unsigned int pitch;
-	unsigned char *pixels = RenderBackend_LockSurface(surf[surf_no], &pitch, width * magnification_scaled, height * magnification_scaled);
-
-	if (pixels == NULL)
-		return FALSE;
 
 	if (magnification_scaled == 1)
 	{
 		// Just copy the pixels the way they are
-		for (int y = 0; y < height; ++y)
-		{
-			const unsigned char *src_row = &image_buffer[y * width * 4];
-			unsigned char *dst_row = &pixels[y * pitch];
-
-			memcpy(dst_row, src_row, width * 4);
-		}
+		RenderBackend_UploadSurface(surf[surf_no], image_buffer, width, height);
 	}
 	else
 	{
+		unsigned char *upscaled_image_buffer = (unsigned char*)malloc(width * mag * height * mag * 4);
+
+		if (upscaled_image_buffer == NULL)
+			return FALSE;
+
 		// Upscale the bitmap to the game's internal resolution
-		for (int y = 0; y < height; ++y)
+		for (size_t y = 0; y < height; ++y)
 		{
 			const unsigned char *src_row = &image_buffer[y * width * 4];
-			unsigned char *dst_row = &pixels[y * pitch * magnification_scaled];
+			unsigned char *dst_row = &upscaled_image_buffer[y * magnification_scaled * width * magnification_scaled * 4];
 
 			const unsigned char *src_ptr = src_row;
 			unsigned char *dst_ptr = dst_row;
 
-			for (int x = 0; x < width; ++x)
+			for (size_t x = 0; x < width; ++x)
 			{
 				for (int i = 0; i < magnification_scaled; ++i)
 				{
@@ -232,11 +249,13 @@ static BOOL ScaleAndUploadSurface(const unsigned char *image_buffer, int width, 
 			}
 
 			for (int i = 1; i < magnification_scaled; ++i)
-				memcpy(dst_row + i * pitch, dst_row, width * magnification_scaled * 4);
+				memcpy(dst_row + i * width * magnification_scaled * 4, dst_row, width * magnification_scaled * 4);
 		}
-	}
 
-	RenderBackend_UnlockSurface(surf[surf_no], width * magnification_scaled, height * magnification_scaled);
+		RenderBackend_UploadSurface(surf[surf_no], upscaled_image_buffer, width * magnification_scaled, height * magnification_scaled);
+
+		free(upscaled_image_buffer);
+	}
 
 	return TRUE;
 }
@@ -256,8 +275,8 @@ BOOL MakeSurface_Resource(const char *name, SurfaceID surf_no)
 	if (data == NULL)
 		return FALSE;
 
-	unsigned int width, height;
-	unsigned char *image_buffer = DecodeBitmapWithAlpha(data, size, &width, &height, FALSE);
+	size_t width, height;
+	unsigned char *image_buffer = DecodeBitmap(data, size, &width, &height, 4);
 
 	if (image_buffer == NULL)
 		return FALSE;
@@ -277,13 +296,13 @@ BOOL MakeSurface_Resource(const char *name, SurfaceID surf_no)
 		return FALSE;
 	}
 
+	FreeBitmap(image_buffer);
+
 	surface_metadata[surf_no].type = SURFACE_SOURCE_RESOURCE;
 	surface_metadata[surf_no].width = width / SPRITE_SCALE;
 	surface_metadata[surf_no].height = height / SPRITE_SCALE;
 	surface_metadata[surf_no].bSystem = FALSE;
 	strcpy(surface_metadata[surf_no].name, name);
-
-	FreeBitmap(image_buffer);
 
 	return TRUE;
 }
@@ -309,7 +328,7 @@ BOOL MakeSurface_File(const char *name, SurfaceID surf_no)
 		return FALSE;
 	}
 
-	unsigned int width, height;
+	size_t width, height;
 	unsigned char *image_buffer = NULL;
 
 	const char *file_extensions[] = {"pbm", "bmp", "png"};
@@ -317,7 +336,7 @@ BOOL MakeSurface_File(const char *name, SurfaceID surf_no)
 	{
 		path = gDataPath + '/' + name + '.' + file_extensions[i];
 
-		image_buffer = DecodeBitmapWithAlphaFromFile(path.c_str(), &width, &height, TRUE);
+		image_buffer = DecodeBitmapFromFile(path.c_str(), &width, &height, 4);
 
 		if (image_buffer != NULL)
 			break;
@@ -344,13 +363,13 @@ BOOL MakeSurface_File(const char *name, SurfaceID surf_no)
 		return FALSE;
 	}
 
+	FreeBitmap(image_buffer);
+
 	surface_metadata[surf_no].type = SURFACE_SOURCE_FILE;
 	surface_metadata[surf_no].width = width / SPRITE_SCALE;
 	surface_metadata[surf_no].height = height / SPRITE_SCALE;
 	surface_metadata[surf_no].bSystem = FALSE;
 	strcpy(surface_metadata[surf_no].name, name);
-
-	FreeBitmap(image_buffer);
 
 	return TRUE;
 }
@@ -367,8 +386,8 @@ BOOL ReloadBitmap_Resource(const char *name, SurfaceID surf_no)
 	if (data == NULL)
 		return FALSE;
 
-	unsigned int width, height;
-	unsigned char *image_buffer = DecodeBitmapWithAlpha(data, size, &width, &height, FALSE);
+	size_t width, height;
+	unsigned char *image_buffer = DecodeBitmap(data, size, &width, &height, 4);
 
 	if (image_buffer == NULL)
 		return FALSE;
@@ -402,7 +421,7 @@ BOOL ReloadBitmap_File(const char *name, SurfaceID surf_no)
 		return FALSE;
 	}
 
-	unsigned int width, height;
+	size_t width, height;
 	unsigned char *image_buffer = NULL;
 
 	const char *file_extensions[] = {"pbm", "bmp", "png"};
@@ -410,7 +429,7 @@ BOOL ReloadBitmap_File(const char *name, SurfaceID surf_no)
 	{
 		path = gDataPath + '/' + name + '.' + file_extensions[i];
 
-		image_buffer = DecodeBitmapWithAlphaFromFile(path.c_str(), &width, &height, TRUE);
+		image_buffer = DecodeBitmapFromFile(path.c_str(), &width, &height, 4);
 
 		if (image_buffer != NULL)
 			break;
@@ -437,7 +456,7 @@ BOOL ReloadBitmap_File(const char *name, SurfaceID surf_no)
 }
 
 // TODO - Inaccurate stack frame
-BOOL MakeSurface_Generic(int bxsize, int bysize, SurfaceID surf_no, BOOL bSystem)
+BOOL MakeSurface_Generic(int bxsize, int bysize, SurfaceID surf_no, BOOL bSystem, BOOL bTarget)
 {
 #ifdef FIX_BUGS
 	if (surf_no >= SURFACE_ID_MAX)
@@ -449,7 +468,7 @@ BOOL MakeSurface_Generic(int bxsize, int bysize, SurfaceID surf_no, BOOL bSystem
 	if (surf[surf_no] != NULL)
 		return FALSE;
 
-	surf[surf_no] = RenderBackend_CreateSurface(bxsize * mag, bysize * mag, true);
+	surf[surf_no] = RenderBackend_CreateSurface(bxsize * mag, bysize * mag, bTarget);
 
 	if (surf[surf_no] == NULL)
 		return FALSE;
@@ -470,6 +489,9 @@ BOOL MakeSurface_Generic(int bxsize, int bysize, SurfaceID surf_no, BOOL bSystem
 
 void BackupSurface(SurfaceID surf_no, const RECT *rect)
 {
+	if (surf[surf_no] == NULL)
+		return;
+
 	static RenderBackend_Rect rcSet;	// TODO - Not the original variable name
 	rcSet.left = rect->left * mag;
 	rcSet.top = rect->top * mag;
@@ -493,6 +515,9 @@ static void ScaleRect(const RECT *rect, RenderBackend_Rect *scaled_rect)
 
 void PutBitmap3(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID surf_no) // Transparency
 {
+	if (surf[surf_no] == NULL)
+		return;
+
 	static RenderBackend_Rect rcWork;
 	ScaleRect(rect, &rcWork);
 
@@ -526,6 +551,9 @@ void PutBitmap3(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID su
 
 void PutBitmap4(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID surf_no) // No Transparency
 {
+	if (surf[surf_no] == NULL)
+		return;
+
 	static RenderBackend_Rect rcWork;
 	ScaleRect(rect, &rcWork);
 
@@ -557,8 +585,11 @@ void PutBitmap4(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID su
 	RenderBackend_Blit(surf[surf_no], &rcWork, framebuffer, x, y, FALSE);
 }
 
-void Surface2Surface(int x, int y, const RECT *rect, int to, int from)
+void Surface2Surface(int x, int y, const RECT *rect, SurfaceID to, SurfaceID from)
 {
+	if (surf[to] == NULL || surf[from] == NULL)
+		return;
+
 	static RenderBackend_Rect rcWork;
 
 	rcWork.left = rect->left * mag;
@@ -600,6 +631,9 @@ void CortBox(const RECT *rect, unsigned long col)
 
 void CortBox2(const RECT *rect, unsigned long col, SurfaceID surf_no)
 {
+	if (surf[surf_no] == NULL)
+		return;
+
 	static RenderBackend_Rect rcSet;	// TODO - Not the original variable name
 	rcSet.left = rect->left * mag;
 	rcSet.top = rect->top * mag;
@@ -622,23 +656,24 @@ void CortBox2(const RECT *rect, unsigned long col, SurfaceID surf_no)
 
 // Dummied-out log function
 // According to the Mac port, its name really is just "out".
-BOOL out(int unknown)
+BOOL out(char surface_identifier)
 {
-	char unknown2[0x100];
-	int unknown3;
-	int unknown4;
-	int unknown5;
+	// The actual name (and type) of these two variables are unknown
+	std::string path;
+	FILE *fp;
 
-	(void)unknown;
-	(void)unknown2;
-	(void)unknown3;
-	(void)unknown4;
-	(void)unknown5;
+	(void)surface_identifier;
+	(void)path;
+	(void)fp;
+
+	// There may have been some kind of 'OutputDebugStringA' call here,
+	// like the one in 'EnumDevices_Callback' in 'Input.cpp'.
+	// Pixel may have kept them wrapped in '#ifdef DEBUG' blocks.
 
 	return TRUE;
 }
 
-// TODO - Probably not the original variable name (this is an educated guess)
+// TODO - Probably not the original function name (this is an educated guess)
 int RestoreSurfaces(void)
 {
 	int s;
@@ -711,35 +746,73 @@ void InitTextObject(const char *name)
 {
 	(void)name;	// Unused in this branch
 
+	// Get font size
+	size_t width, height;
+
+	// Let me tell you why these font sizes are unfortunate...
+	// 6x12 is a good font size - fonts use high-quality bitmaps at that
+	// size, and it works with Cave Story's internal assumption that
+	// characters are spaced 6 pixels apart.
+	// The sad part is the 10x20 size: you might be wondering why Pixel
+	// didn't use 12x24 instead. Well, that's because fonts don't use
+	// bitmaps at that size - instead you get ugly low-res vector
+	// renders. So, Pixel had to use 10x20 instead. But there's a
+	// problem: this means the characters are spaced 5 pixels apart
+	// instead. This normally isn't a problem because the game usually
+	// hardcodes it, but this isn't the case when either <SAT is used, a
+	// texture is regenerated, or when the game prints the name of the
+	// map. This causes the font to render with incorrect spacing.
+	// There's really not much of a solution to this, especially when
+	// you consider that the English translation was specifically built
+	// around the broken spacing.
+
+#ifdef JAPANESE
+	if (mag == 2)
+	{
+		// Special-case 2 to use a size more
+		// likely to have embedded bitmaps
+		font_height = 10;
+		font_width = 5;
+	}
+	else
+	{
+		font_height = 12;
+		font_width = 6;
+	}
+
+	bool antialiasing = false;
+#else
+	font_height = 10;
+	font_width = 5;
+
+	bool antialiasing = mag != 1;	// The 1x font looks better without antialiasing
+#endif
+
+#ifdef FREETYPE_FONTS
 	std::string path = gDataPath + "/Font/font";
 
-	// Get font size
-	unsigned int width, height;
+	font = LoadFreeTypeFont(path.c_str(), font_width * mag, font_height * mag, antialiasing);
+#else
+	std::string bitmap_path;
+	std::string metadata_path;
 
 	switch (mag)
 	{
-#ifdef JAPANESE
 		case 1:
-			height = 12;
-			width = 12;
+			bitmap_path = gDataPath + "/Font/font_bitmap_6x12.png";
+			metadata_path = gDataPath + "/Font/font_bitmap_6x12.dat";
 			break;
 
-		default:
-			height = 10 * mag;
-			width = 10 * mag;
-#else
-		case 1:
-			height = 10;
-			width = 9;
+		case 2:
+			bitmap_path = gDataPath + "/Font/font_bitmap_10x20.png";
+			metadata_path = gDataPath + "/Font/font_bitmap_10x20.dat";
 			break;
 
-		default:
-			height = 9 * mag;
-			width = (17 * mag) / 2;	// 8.5
-#endif
+		// TODO - Fix other resolutions
 	}
 
-	font = LoadFont(path.c_str(), width, height);
+	font = LoadBitmapFont(bitmap_path.c_str(), metadata_path.c_str());
+#endif
 }
 
 void PutText(int x, int y, const char *text, unsigned long color)
@@ -749,6 +822,9 @@ void PutText(int x, int y, const char *text, unsigned long color)
 
 void PutText2(int x, int y, const char *text, unsigned long color, SurfaceID surf_no)
 {
+	if (surf[surf_no] == NULL)
+		return;
+
 	DrawText(font, surf[surf_no], x * mag, y * mag, color, text);
 }
 

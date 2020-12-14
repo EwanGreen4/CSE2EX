@@ -1,12 +1,20 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #pragma once
 
 #include <stddef.h>
 
 #include "Backends/Rendering.h"
 
-typedef struct FontObject FontObject;
+typedef struct Font Font;
 
-FontObject* LoadFontFromData(const unsigned char *data, size_t data_size, unsigned int cell_width, unsigned int cell_height);
-FontObject* LoadFont(const char *font_filename, unsigned int cell_width, unsigned int cell_height);
-void DrawText(FontObject *font_object, RenderBackend_Surface *surface, int x, int y, unsigned long colour, const char *string);
-void UnloadFont(FontObject *font_object);
+#ifdef FREETYPE_FONTS
+Font* LoadFreeTypeFontFromData(const unsigned char *data, size_t data_size, size_t cell_width, size_t cell_height, bool antialiasing);
+Font* LoadFreeTypeFont(const char *font_filename, size_t cell_width, size_t cell_height, bool antialiasing);
+#else
+Font* LoadBitmapFont(const char *bitmap_path, const char *metadata_path);
+#endif
+
+void DrawText(Font *font, RenderBackend_Surface *surface, int x, int y, unsigned long colour, const char *string);
+void UnloadFont(Font *font);

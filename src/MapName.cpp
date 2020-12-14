@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "MapName.h"
 
 #include <string.h>
@@ -15,7 +22,7 @@ void ReadyMapName(const char *str)
 	int a;
 
 	// Handle "Studio Pixel presents" text in the intro, using an obfuscated string
-	unsigned char presentText[24] = {
+	unsigned char presentText[] = {
 #ifdef JAPANESE
 		// "開発室Pixel presents"
 		0x8A - 1,	// 開

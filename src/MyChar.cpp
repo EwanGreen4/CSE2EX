@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "MyChar.h"
 
 #include <stddef.h>
@@ -7,6 +14,7 @@
 
 #include "ArmsItem.h"
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Draw.h"
 #include "Flags.h"
 #include "Game.h"
@@ -45,19 +53,19 @@ void InitMyChar(void)
 	gMC.physics_normal.max_move = 0x5FF;
 	gMC.physics_normal.gravity1 = 0x50;
 	gMC.physics_normal.gravity2 = 0x20;
-	gMC.physics_normal.dash1 = 0x55;
-	gMC.physics_normal.dash2 = 0x20;
-	gMC.physics_normal.resist = 0x33;
+	gMC.physics_normal.dash1 = 0x200 / 6;
+	gMC.physics_normal.dash2 = 0x200 / 16;
+	gMC.physics_normal.resist = 0x200 / 10;
 	gMC.physics_normal.jump = 0x500;
 
-	gMC.physics_underwater.max_dash = 0x196;
-	gMC.physics_underwater.max_move = 0x2FF;
-	gMC.physics_underwater.gravity1 = 0x28;
-	gMC.physics_underwater.gravity2 = 0x10;
-	gMC.physics_underwater.dash1 = 0x2A;
-	gMC.physics_underwater.dash2 = 0x10;
-	gMC.physics_underwater.resist = 0x19;
-	gMC.physics_underwater.jump = 0x280;
+	gMC.physics_underwater.max_dash = 0x32C / 2;
+	gMC.physics_underwater.max_move = 0x5FF / 2;
+	gMC.physics_underwater.gravity1 = 0x50 / 2;
+	gMC.physics_underwater.gravity2 = 0x20 / 2;
+	gMC.physics_underwater.dash1 = 0x200 / 6 / 2;
+	gMC.physics_underwater.dash2 = 0x200 / 16 / 2;
+	gMC.physics_underwater.resist = 0x200 / 10 / 2;
+	gMC.physics_underwater.jump = 0x500 / 2;
 
 	gMC.no_splash_or_air_limit_underwater = 0;
 }
@@ -507,9 +515,9 @@ void ActMyChar_Normal(BOOL bKey)
 			if (gKeyTrg & gKeyJump || gMC.boost_cnt % 3 == 1)
 			{
 				if (gMC.direct == 0)
-					SetCaret(gMC.x + (2 * 0x200), gMC.y + (2 * 0x200), 7, 2);
+					SetCaret(gMC.x + (2 * 0x200), gMC.y + (2 * 0x200), CARET_EXHAUST, DIR_RIGHT);
 				if (gMC.direct == 2)
-					SetCaret(gMC.x - (2 * 0x200), gMC.y + (2 * 0x200), 7, 0);
+					SetCaret(gMC.x - (2 * 0x200), gMC.y + (2 * 0x200), CARET_EXHAUST, DIR_LEFT);
 
 				PlaySoundObject(113, SOUND_MODE_PLAY);
 			}
@@ -522,14 +530,14 @@ void ActMyChar_Normal(BOOL bKey)
 			// Boost particles (and sound)
 			if (gKeyTrg & gKeyJump || gMC.boost_cnt % 3 == 1)
 			{
-				SetCaret(gMC.x, gMC.y + (6 * 0x200), 7, 3);
+				SetCaret(gMC.x, gMC.y + (6 * 0x200), CARET_EXHAUST, DIR_DOWN);
 				PlaySoundObject(113, SOUND_MODE_PLAY);
 			}
 		}
 		else if (gMC.boost_sw == 3 && (gKeyTrg & gKeyJump || gMC.boost_cnt % 3 == 1))
 		{
 			// Boost particles (and sound)
-			SetCaret(gMC.x, gMC.y - (6 * 0x200), 7, 1);
+			SetCaret(gMC.x, gMC.y - (6 * 0x200), CARET_EXHAUST, DIR_UP);
 			PlaySoundObject(113, SOUND_MODE_PLAY);
 		}
 	}
@@ -546,7 +554,7 @@ void ActMyChar_Normal(BOOL bKey)
 
 		if (gMC.boost_cnt % 3 == 0)
 		{
-			SetCaret(gMC.x, gMC.y + (gMC.hit.bottom / 2), 7, 3);
+			SetCaret(gMC.x, gMC.y + (gMC.hit.bottom / 2), CARET_EXHAUST, DIR_DOWN);
 			PlaySoundObject(113, SOUND_MODE_PLAY);
 		}
 
@@ -763,9 +771,9 @@ void ActMyChar_Stream(BOOL bKey)
 	}
 
 	if (gMC.ym < -0x200 && gMC.flag & 2)
-		SetCaret(gMC.x, gMC.y - gMC.hit.top, 13, 5);
+		SetCaret(gMC.x, gMC.y - gMC.hit.top, CARET_TINY_PARTICLES, DIR_OTHER);
 	if (gMC.ym > 0x200 && gMC.flag & 8)
-		SetCaret(gMC.x, gMC.y + gMC.hit.bottom, 13, 5);
+		SetCaret(gMC.x, gMC.y + gMC.hit.bottom, CARET_TINY_PARTICLES, DIR_OTHER);
 
 	if (gMC.xm > 0x400)
 		gMC.xm = 0x400;
@@ -841,9 +849,9 @@ void AirProcess(void)
 					StartTextScript(41);
 
 					if (gMC.direct == 0)
-						SetCaret(gMC.x, gMC.y, 8, 0);
+						SetCaret(gMC.x, gMC.y, CARET_DROWNED_QUOTE, DIR_LEFT);
 					else
-						SetCaret(gMC.x, gMC.y, 8, 2);
+						SetCaret(gMC.x, gMC.y, CARET_DROWNED_QUOTE, DIR_RIGHT);
 
 					gMC.cond &= ~0x80;
 				}

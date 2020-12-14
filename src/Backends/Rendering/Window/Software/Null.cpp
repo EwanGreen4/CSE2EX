@@ -1,3 +1,6 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "../Software.h"
 
 #include <stddef.h>
@@ -6,7 +9,7 @@
 static unsigned char *framebuffer;
 static size_t framebuffer_pitch;
 
-bool WindowBackend_Software_CreateWindow(const char *window_title, int screen_width, int screen_height, bool fullscreen, bool *vsync)
+bool WindowBackend_Software_CreateWindow(const char *window_title, size_t screen_width, size_t screen_height, bool fullscreen, bool *vsync)
 {
 	(void)window_title;
 	(void)fullscreen;
@@ -40,7 +43,7 @@ void WindowBackend_Software_Display(void)
 	
 }
 
-void WindowBackend_Software_HandleWindowResize(unsigned int width, unsigned int height)
+void WindowBackend_Software_HandleWindowResize(size_t width, size_t height)
 {
 	(void)width;
 	(void)height;

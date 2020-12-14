@@ -1,11 +1,17 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "../Misc.h"
 
 #include <string>
 
 #include "../../Attributes.h"
 
-bool Backend_Init(void)
+bool Backend_Init(void (*drag_and_drop_callback)(const char *path), void (*window_focus_callback)(bool focus))
 {
+	(void)drag_and_drop_callback;
+	(void)window_focus_callback;
+
 	return true;
 }
 
@@ -19,9 +25,10 @@ void Backend_PostWindowCreation(void)
 	
 }
 
-bool Backend_GetBasePath(std::string *string_buffer)
+bool Backend_GetPaths(std::string *module_path, std::string *data_path)
 {
-	(void)string_buffer;
+	(void)module_path;
+	(void)data_path;
 
 	return false;
 }
@@ -31,21 +38,21 @@ void Backend_HideMouse(void)
 	
 }
 
-void Backend_SetWindowIcon(const unsigned char *rgb_pixels, unsigned int width, unsigned int height)
+void Backend_SetWindowIcon(const unsigned char *rgb_pixels, size_t width, size_t height)
 {
 	(void)rgb_pixels;
 	(void)width;
 	(void)height;
 }
 
-void Backend_SetCursor(const unsigned char *rgb_pixels, unsigned int width, unsigned int height)
+void Backend_SetCursor(const unsigned char *rgba_pixels, size_t width, size_t height)
 {
-	(void)rgb_pixels;
+	(void)rgba_pixels;
 	(void)width;
 	(void)height;
 }
 
-void PlaybackBackend_EnableDragAndDrop(void)
+void Backend_EnableDragAndDrop(void)
 {
 	
 }
@@ -95,9 +102,4 @@ void Backend_Delay(unsigned int ticks)
 void Backend_GetDisplayMode(Backend_DisplayMode *display_mode)
 {
 	(void)display_mode;
-}
-
-bool Backend_IsConsole(void)
-{
-	return false;
 }

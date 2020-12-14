@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "Back.h"
 
 #include <stddef.h>
@@ -18,13 +25,13 @@ static unsigned long color_black;
 // TODO - Another function that has an incorrect stack frame
 BOOL InitBack(const char *fName, int type)
 {
-	// Unused
-	color_black = GetCortBoxColor(RGB(0, 0, 0x10));
+	std::string path;
+	FILE *fp;
+
+	color_black = GetCortBoxColor(RGB(0, 0, 0x10));	// Unused. This may have once been used by background type 4 (the solid black background)
 
 	// Get width and height
-	std::string path;
-
-	FILE *fp = NULL;
+	fp = NULL;
 	const char *bmp_file_extensions[] = {"pbm", "bmp"};
 	for (size_t i = 0; i < sizeof(bmp_file_extensions) / sizeof(bmp_file_extensions[0]) && fp == NULL; ++i)
 	{
@@ -36,10 +43,10 @@ BOOL InitBack(const char *fName, int type)
 	{
 		if (fgetc(fp) != 'B' || fgetc(fp) != 'M')
 		{
-	#ifdef FIX_BUGS
+		#ifdef FIX_MAJOR_BUGS
 			// The original game forgets to close fp
 			fclose(fp);
-	#endif
+		#endif
 			return FALSE;
 		}
 
@@ -74,8 +81,9 @@ BOOL InitBack(const char *fName, int type)
 	gBack.partsW /= SPRITE_SCALE;
 	gBack.partsH /= SPRITE_SCALE;
 
-	// Set background stuff and load texture
-	gBack.flag = TRUE;
+	gBack.flag = TRUE;	// This variable is otherwise unused
+
+	// *Now* we actually load the bitmap
 	if (!ReloadBitmap_File(fName, SURFACE_ID_LEVEL_BACKGROUND))
 		return FALSE;
 
@@ -88,18 +96,19 @@ void ActBack(void)
 {
 	switch (gBack.type)
 	{
-		case 5:
+		case BACKGROUND_TYPE_AUTOSCROLL:
 			gBack.fx += 6 * 0x200;
 			break;
 
-		case 6:
-		case 7:
+		case BACKGROUND_TYPE_CLOUDS_WINDY:
+		case BACKGROUND_TYPE_CLOUDS:
 			++gBack.fx;
 			gBack.fx %= 640;
 			break;
 	}
 }
 
+/// Draw background background elements
 void PutBack(int fx, int fy)
 {
 	int x, y;
@@ -107,36 +116,38 @@ void PutBack(int fx, int fy)
 
 	switch (gBack.type)
 	{
-		case 0:
+		case BACKGROUND_TYPE_STATIONARY:
 			for (y = 0; y < WINDOW_HEIGHT; y += gBack.partsH)
 				for (x = 0; x < WINDOW_WIDTH; x += gBack.partsW)
 					PutBitmap4(&grcGame, PixelToScreenCoord(x), PixelToScreenCoord(y), &rect, SURFACE_ID_LEVEL_BACKGROUND);
 
 			break;
 
-		case 1:
+		case BACKGROUND_TYPE_MOVE_DISTANT:
 			for (y = -(fy / 2 % (gBack.partsH * 0x200)); y < WINDOW_HEIGHT * 0x200; y += gBack.partsH * 0x200)
 				for (x = -(fx / 2 % (gBack.partsW * 0x200)); x < WINDOW_WIDTH * 0x200; x += gBack.partsW * 0x200)
 					PutBitmap4(&grcGame, SubpixelToScreenCoord(x), SubpixelToScreenCoord(y), &rect, SURFACE_ID_LEVEL_BACKGROUND);
 
 			break;
 
-		case 2:
+		case BACKGROUND_TYPE_MOVE_NEAR:
 			for (y = -(fy % (gBack.partsH * 0x200)); y < WINDOW_HEIGHT * 0x200; y += gBack.partsH * 0x200)
 				for (x = -(fx % (gBack.partsW * 0x200)); x < WINDOW_WIDTH * 0x200; x += gBack.partsW * 0x200)
 					PutBitmap4(&grcGame, SubpixelToScreenCoord(x), SubpixelToScreenCoord(y), &rect, SURFACE_ID_LEVEL_BACKGROUND);
 
 			break;
 
-		case 5:
+		case BACKGROUND_TYPE_AUTOSCROLL:
 			for (y = -gBack.partsH; y < WINDOW_HEIGHT; y += gBack.partsH)
 				for (x = -(gBack.fx % (gBack.partsW * 0x200)); x < WINDOW_WIDTH * 0x200; x += gBack.partsW * 0x200)
 					PutBitmap4(&grcGame, SubpixelToScreenCoord(x), PixelToScreenCoord(y), &rect, SURFACE_ID_LEVEL_BACKGROUND);
 
 			break;
 
-		case 6:
-		case 7:
+		case BACKGROUND_TYPE_CLOUDS_WINDY:
+		case BACKGROUND_TYPE_CLOUDS:
+			// Draw sky
+
 			// Draw the top row (including the moon/sun)
 			rect.top = 0;
 			rect.bottom = 88;
@@ -157,6 +168,7 @@ void PutBack(int fx, int fy)
 
 			// Draw each cloud layer from top to bottom
 
+			// Draw first cloud layer
 			rect.top = 88;
 			rect.bottom = 123;
 			rect.left = 0;
@@ -164,6 +176,7 @@ void PutBack(int fx, int fy)
 			for (x = -((gBack.fx * 0x200) / 2); x < WINDOW_WIDTH * 0x200; x += 320 * 0x200)
 				PutBitmap4(&grcGame, SubpixelToScreenCoord(x), PixelToScreenCoord(88), &rect, SURFACE_ID_LEVEL_BACKGROUND);
 
+			// Draw second cloud layer
 			rect.top = 123;
 			rect.bottom = 146;
 			rect.left = 0;
@@ -171,6 +184,7 @@ void PutBack(int fx, int fy)
 			for (x = -((gBack.fx % 320) * 0x200); x < WINDOW_WIDTH * 0x200; x += 320 * 0x200)
 				PutBitmap4(&grcGame, SubpixelToScreenCoord(x), PixelToScreenCoord(123), &rect, SURFACE_ID_LEVEL_BACKGROUND);
 
+			// Draw third cloud layer
 			rect.top = 146;
 			rect.bottom = 176;
 			rect.left = 0;
@@ -178,6 +192,7 @@ void PutBack(int fx, int fy)
 			for (x = -(((gBack.fx * 2) % 320) * 0x200); x < WINDOW_WIDTH * 0x200; x += 320 * 0x200)
 				PutBitmap4(&grcGame, SubpixelToScreenCoord(x), PixelToScreenCoord(146), &rect, SURFACE_ID_LEVEL_BACKGROUND);
 
+			// Draw fourth cloud layer
 			rect.top = 176;
 			rect.bottom = 240;
 			rect.left = 0;
@@ -189,6 +204,7 @@ void PutBack(int fx, int fy)
 	}
 }
 
+/// Draw background foreground elements - only the water background type makes use of this
 void PutFront(int fx, int fy)
 {
 	int xpos, ypos;
@@ -201,7 +217,7 @@ void PutFront(int fx, int fy)
 
 	switch (gBack.type)
 	{
-		case 3:
+		case BACKGROUND_TYPE_WATER:
 			x_1 = fx / (32 * 0x200);
 			x_2 = x_1 + (((WINDOW_WIDTH + (32 - 1)) / 32) + 1);
 			y_1 = 0;

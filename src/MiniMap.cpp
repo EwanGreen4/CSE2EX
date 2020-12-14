@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "MiniMap.h"
 
 #include <string.h>
@@ -35,39 +42,39 @@ void WriteMiniMapLine(int line)
 		// No switch here.
 		if (a == 0)
 			Surface2Surface(x, line, &rcLevel[0], SURFACE_ID_MAP, SURFACE_ID_TEXT_BOX);
-		else if (a == 68 ||
-			a == 1 ||
-			a == 64 ||
-			a == 128 ||
-			a == 129 ||
-			a == 130 ||
-			a == 131 ||
-			a == 81 ||
-			a == 82 ||
-			a == 85 ||
-			a == 86 ||
-			a == 2 ||
-			a == 96 ||
-			a == 113 ||
-			a == 114 ||
-			a == 117 ||
-			a == 118 ||
-			a == 160 ||
-			a == 161 ||
-			a == 162 ||
-			a == 163)
+		else if (a == 68  ||
+		         a == 1   ||
+		         a == 64  ||
+		         a == 128 ||
+		         a == 129 ||
+		         a == 130 ||
+		         a == 131 ||
+		         a == 81  ||
+		         a == 82  ||
+		         a == 85  ||
+		         a == 86  ||
+		         a == 2   ||
+		         a == 96  ||
+		         a == 113 ||
+		         a == 114 ||
+		         a == 117 ||
+		         a == 118 ||
+		         a == 160 ||
+		         a == 161 ||
+		         a == 162 ||
+		         a == 163)
 			Surface2Surface(x, line, &rcLevel[1], SURFACE_ID_MAP, SURFACE_ID_TEXT_BOX);
-		else if (a == 67 ||
-			a == 99 ||
-			a == 80 ||
-			a == 83 ||
-			a == 84 ||
-			a == 87 ||
-			a == 96 ||	// This is already listed above, so that part of the expression is always false
-			a == 112 ||
-			a == 115 ||
-			a == 116 ||
-			a == 119)
+		else if (a == 67  ||
+		         a == 99  ||
+		         a == 80  ||
+		         a == 83  ||
+		         a == 84  ||
+		         a == 87  ||
+		         a == 96  ||	// This is already listed above, so this part of the expression is always false
+		         a == 112 ||
+		         a == 115 ||
+		         a == 116 ||
+		         a == 119)
 			Surface2Surface(x, line, &rcLevel[2], SURFACE_ID_MAP, SURFACE_ID_TEXT_BOX);
 		else
 			Surface2Surface(x, line, &rcLevel[3], SURFACE_ID_MAP, SURFACE_ID_TEXT_BOX);
@@ -136,8 +143,10 @@ int MiniMapLoop(void)
 	rcMiniMap.top = 0;
 	rcMiniMap.bottom = gMap.length;
 
-	rcView.right = --rcView.left + gMap.width + 2;
-	rcView.bottom = --rcView.top + gMap.length + 2;
+	rcView.left -= 1;
+	rcView.right = rcView.left + gMap.width + 2;
+	rcView.top -= 1;
+	rcView.bottom = rcView.top + gMap.length + 2;
 	CortBox2(&rcMiniMap, 0, SURFACE_ID_MAP);
 
 	line = 0;

@@ -1,5 +1,9 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #pragma once
 
+#include <stddef.h>
 #include <string>
 
 #include "../Attributes.h"
@@ -92,14 +96,14 @@ typedef struct Backend_DisplayMode
 	unsigned int refresh_rate;
 } Backend_DisplayMode;
 
-bool Backend_Init(void);
+bool Backend_Init(void (*drag_and_drop_callback)(const char *path), void (*window_focus_callback)(bool focus));
 void Backend_Deinit(void);
 void Backend_PostWindowCreation(void);
-bool Backend_GetBasePath(std::string *string_buffer);
+bool Backend_GetPaths(std::string *module_path, std::string *data_path);
 void Backend_HideMouse(void);
-void Backend_SetWindowIcon(const unsigned char *rgb_pixels, unsigned int width, unsigned int height);
-void Backend_SetCursor(const unsigned char *rgba_pixels, unsigned int width, unsigned int height);
-void PlaybackBackend_EnableDragAndDrop(void);
+void Backend_SetWindowIcon(const unsigned char *rgb_pixels, size_t width, size_t height);
+void Backend_SetCursor(const unsigned char *rgba_pixels, size_t width, size_t height);
+void Backend_EnableDragAndDrop(void);
 bool Backend_SystemTask(bool active);
 void Backend_GetKeyboardState(bool *keyboard_state);
 void Backend_ShowMessageBox(const char *title, const char *message);
@@ -108,4 +112,3 @@ ATTRIBUTE_FORMAT_PRINTF(1, 2) void Backend_PrintInfo(const char *format, ...);
 unsigned long Backend_GetTicks(void);
 void Backend_Delay(unsigned int ticks);
 void Backend_GetDisplayMode(Backend_DisplayMode *display_mode);
-bool Backend_IsConsole(void);

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #pragma once
 
 #include "WindowsWrapper.h"
@@ -28,7 +35,7 @@ typedef struct CONFIG_BINDING
 	unsigned char controller;
 } CONFIG_BINDING;
 
-struct CONFIG
+struct CONFIGDATA
 {
 	char proof[0x20];
 	char font_name[0x40];
@@ -43,6 +50,6 @@ struct CONFIG
 extern const char* const gConfigName;
 extern const char* const gProof;
 
-BOOL LoadConfigData(CONFIG *conf);
-BOOL SaveConfigData(const CONFIG *conf);
-void DefaultConfigData(CONFIG *conf);
+BOOL LoadConfigData(CONFIGDATA *conf);
+BOOL SaveConfigData(const CONFIGDATA *conf);
+void DefaultConfigData(CONFIGDATA *conf);

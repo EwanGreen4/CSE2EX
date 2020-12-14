@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #pragma once
 
 #include "WindowsWrapper.h"
@@ -18,7 +25,7 @@ enum SoundEffectNames
 	SND_SILLY_EXPLOSION = 25,
 	SND_LARGE_OBJECT_HIT_GROUND = 26,
 	// To be continued
-	SND_ENEMY_SHOOT_PROJETILE = 39,
+	SND_ENEMY_SHOOT_PROJECTILE = 39,
 	// To be continued
 	SND_BEHEMOTH_LARGE_HURT = 52,
 	// To be continued

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -7,6 +14,7 @@
 #include "Back.h"
 #include "Bullet.h"
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Flags.h"
 #include "Frame.h"
 #include "Game.h"
@@ -270,13 +278,13 @@ void ActNpc180(NPCHAR *npc)
 #else
 			if (npc->flag && 5)
 #endif
-				npc->ym += 0x10;
+				npc->ym += 0x200 / 32;
 			else
-				npc->ym += 0x33;
+				npc->ym += 0x200 / 10;
 		}
 		else
 		{
-			npc->ym += 0x33;
+			npc->ym += 0x200 / 10;
 		}
 	}
 
@@ -386,12 +394,12 @@ void ActNpc181(NPCHAR *npc)
 					if (npc->direct == 0)
 					{
 						SetBullet(12, npc->x - (4 * 0x200), npc->y + (3 * 0x200), 0);
-						SetCaret(npc->x - (4 * 0x200), npc->y + (3 * 0x200), 3, 0);
+						SetCaret(npc->x - (4 * 0x200), npc->y + (3 * 0x200), CARET_SHOOT, DIR_LEFT);
 					}
 					else
 					{
 						SetBullet(12, npc->x + (4 * 0x200), npc->y + (3 * 0x200), 2);
-						SetCaret(npc->x + (4 * 0x200), npc->y + (3 * 0x200), 3, 0);
+						SetCaret(npc->x + (4 * 0x200), npc->y + (3 * 0x200), CARET_SHOOT, DIR_LEFT);
 					}
 				}
 				else
@@ -399,12 +407,12 @@ void ActNpc181(NPCHAR *npc)
 					if (npc->direct == 0)
 					{
 						SetBullet(12, npc->x - (2 * 0x200), npc->y - (4 * 0x200), 1);
-						SetCaret(npc->x - (2 * 0x200), npc->y - (4 * 0x200), 3, 0);
+						SetCaret(npc->x - (2 * 0x200), npc->y - (4 * 0x200), CARET_SHOOT, DIR_LEFT);
 					}
 					else
 					{
 						SetBullet(12, npc->x + (2 * 0x200), npc->y - (4 * 0x200), 1);
-						SetCaret(npc->x + (2 * 0x200), npc->y - (4 * 0x200), 3, 0);
+						SetCaret(npc->x + (2 * 0x200), npc->y - (4 * 0x200), CARET_SHOOT, DIR_LEFT);
 					}
 				}
 			}
@@ -493,12 +501,12 @@ void ActNpc182(NPCHAR *npc)
 					if (npc->direct == 0)
 					{
 						SetBullet(6, npc->x - (4 * 0x200), npc->y + (3 * 0x200), 0);
-						SetCaret(npc->x - (4 * 0x200), npc->y + (3 * 0x200), 3, 0);
+						SetCaret(npc->x - (4 * 0x200), npc->y + (3 * 0x200), CARET_SHOOT, DIR_LEFT);
 					}
 					else
 					{
 						SetBullet(6, npc->x + (4 * 0x200), npc->y + (3 * 0x200), 2);
-						SetCaret(npc->x + (4 * 0x200), npc->y + (3 * 0x200), 3, 0);
+						SetCaret(npc->x + (4 * 0x200), npc->y + (3 * 0x200), CARET_SHOOT, DIR_LEFT);
 					}
 				}
 				else
@@ -506,12 +514,12 @@ void ActNpc182(NPCHAR *npc)
 					if (npc->direct == 0)
 					{
 						SetBullet(6, npc->x - (2 * 0x200), npc->y - (4 * 0x200), 1);
-						SetCaret(npc->x - (2 * 0x200), npc->y - (4 * 0x200), 3, 0);
+						SetCaret(npc->x - (2 * 0x200), npc->y - (4 * 0x200), CARET_SHOOT, DIR_LEFT);
 					}
 					else
 					{
 						SetBullet(6, npc->x + (2 * 0x200), npc->y - (4 * 0x200), 1);
-						SetCaret(npc->x + (2 * 0x200), npc->y - (4 * 0x200), 3, 0);
+						SetCaret(npc->x + (2 * 0x200), npc->y - (4 * 0x200), CARET_SHOOT, DIR_LEFT);
 					}
 				}
 			}
@@ -1184,9 +1192,9 @@ void ActNpc192(NPCHAR *npc)
 		PlaySoundObject(34, SOUND_MODE_PLAY);
 
 		if (npc->direct == 0)
-			SetCaret(npc->x + (10 * 0x200), npc->y + (10 * 0x200), 7, 2);
+			SetCaret(npc->x + (10 * 0x200), npc->y + (10 * 0x200), CARET_EXHAUST, DIR_RIGHT);
 		else
-			SetCaret(npc->x - (10 * 0x200), npc->y + (10 * 0x200), 7, 0);
+			SetCaret(npc->x - (10 * 0x200), npc->y + (10 * 0x200), CARET_EXHAUST, DIR_LEFT);
 	}
 
 	RECT rcLeft[2] = {
@@ -1428,7 +1436,7 @@ void ActNpc199(NPCHAR *npc)
 	if (npc->ani_no > 4)
 	{
 		npc->cond = 0;
-	#ifdef FIX_BUGS
+	#ifdef FIX_MAJOR_BUGS
 		return;	// The code below will use 'ani_no' to access 'rect', even though it's now too high
 	#endif
 	}

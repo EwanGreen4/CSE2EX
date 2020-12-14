@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 // Some of the original source code for this file can be found here:
 // https://github.com/shbow/organya/blob/master/source/Sound.cpp
 
@@ -13,6 +20,7 @@ equivalents.
 #include "Sound.h"
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -40,10 +48,10 @@ BOOL InitDirectSound(void)
 
 	if (!audio_backend_initialised)
 	{
-#ifndef FIX_BUGS
+	#ifndef FIX_BUGS
 		// This makes absolutely no sense here
 		StartOrganya("Org/Wave.dat");
-#endif
+	#endif
 		return FALSE;
 	}
 
@@ -143,7 +151,7 @@ BOOL LoadSoundObject(const char *file_name, int no)
 	//	fread(&check_box[i], sizeof(char), 1, fp);	// Holy hell, this is inefficient
 	fread(check_box, 1, 58, fp);
 
-#ifdef FIX_BUGS
+#ifdef FIX_MAJOR_BUGS
 	// The original code forgets to close 'fp'
 	if (check_box[0] != 'R' || check_box[1] != 'I' || check_box[2] != 'F' || check_box[3] != 'F')
 	{
@@ -164,7 +172,7 @@ BOOL LoadSoundObject(const char *file_name, int no)
 	unsigned char *wp;
 	wp = (unsigned char*)malloc(file_size);	// ファイルのワークスペースを作る (Create a file workspace)
 
-#ifdef FIX_BUGS
+#ifdef FIX_MAJOR_BUGS
 	if (wp == NULL)
 	{
 		fclose(fp);
@@ -211,10 +219,10 @@ BOOL LoadSoundObject(const char *file_name, int no)
 
 	if (lpSECONDARYBUFFER[no] == NULL)
 	{
-#ifdef FIX_BUGS
+#ifdef FIX_MAJOR_BUGS
 		free(wp);	// The updated Organya source code includes this fix
 #endif
-		return FALSE;	
+		return FALSE;
 	}
 	
 	free(wp);

@@ -2,7 +2,7 @@
 /obj
 
 # Exclude the (recommended) CMake build directory
-/build
+/build*
 
 # Exclude executables
 /game_english/CSE2_debug.exe
@@ -15,6 +15,8 @@
 /game_english/DoConfig
 /game_english/CSE2_debug.rpx
 /game_english/CSE2.rpx
+/game_english/CSE2.3dsx
+/game_english/\!CSE2
 /game_japanese/CSE2_debug.exe
 /game_japanese/DoConfig_debug.exe
 /game_japanese/CSE2.exe
@@ -25,13 +27,38 @@
 /game_japanese/DoConfig
 /game_japanese/CSE2_debug.rpx
 /game_japanese/CSE2.rpx
+/game_japanese/CSE2.3dsx
+/game_japanese/\!CSE2
+
+# Exclude MSVC debug data
+/game_english/CSE2_debug.ilk
+/game_english/CSE2_debug.pdb
+/game_english/DoConfig_debug.ilk
+/game_english/DoConfig_debug.pdb
+/game_english/CSE2.ilk
+/game_english/CSE2.pdb
+/game_english/DoConfig.ilk
+/game_english/DoConfig.pdb
+/game_japanese/CSE2_debug.ilk
+/game_japanese/CSE2_debug.pdb
+/game_japanese/DoConfig_debug.ilk
+/game_japanese/DoConfig_debug.pdb
+/game_japanese/CSE2.ilk
+/game_japanese/CSE2.pdb
+/game_japanese/DoConfig.ilk
+/game_japanese/DoConfig.pdb
+
+# Exclude misc. MSVC junk
+/.vs
+/out
+/CMakeSettings.json
 
 # Exclude save data
-/game_english/Config.dat
+/game_english/ConfigCSE2E.dat
 /game_english/Profile.dat
 /game_english/290.rec
 /game_english/window.rect
-/game_japanese/Config.dat
+/game_japanese/ConfigCSE2E.dat
 /game_japanese/Profile.dat
 /game_japanese/290.rec
 /game_japanese/window.rect
@@ -46,48 +73,9 @@
 /game_japanese/save
 /game_japanese/s_reverse
 
-###################
-# Accurate branch #
-###################
-
-# Exclude devilution-comparer assembly output
-/devilution/orig.asm
-/devilution/compare.asm
-
-# Exclude MSVC IntelliSense database
-/vs2003/CSE2.ncb
-
-# Exclude MSVC Solution User Options file
-/vs2003/CSE2.suo
-
-# Exclude MSVC build folders
-/vs2003/Debug
-/vs2003/Release
-/vs2003/Debug (Japanese)
-/vs2003/Release (Japanese)
-
-###################
-# Portable branch #
-###################
-
-# Exclude Wii U build directory
-/buildwiiu
+# Exclude error logs
+/game_english/error.log
+/game_japanese/error.log
 
 # Exclude converted resource files
 /src/Resource
-
-########################
-# Enhanced-lite branch #
-########################
-
-# Exclude CSE2EL configuration file
-/game_english/ConfigCSE2EL.dat
-/game_japanese/ConfigCSE2EL.dat
-
-###################
-# Enhanced branch #
-###################
-
-# Exclude CSE2E configuration file
-/game_english/ConfigCSE2E.dat
-/game_japanese/ConfigCSE2E.dat

@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "PixTone.h"
 
 #include <math.h>
@@ -63,7 +70,7 @@ void MakeWaveTables(void)
 		gWaveModelTable[5][i] = (signed char)(msvc_rand() & 0xFF) / 2;
 }
 
-//BOOL wave_tables_made;
+BOOL wave_tables_made;
 
 ATTRIBUTE_HOT BOOL MakePixelWaveData(const PIXTONEPARAMETER *ptp, unsigned char *pData)
 {
@@ -80,11 +87,11 @@ ATTRIBUTE_HOT BOOL MakePixelWaveData(const PIXTONEPARAMETER *ptp, unsigned char 
 	double d1, d2, d3;
 
 	// The Linux port added a cute optimisation here, where MakeWaveTables is only called once during the game's execution
-	//if (wave_tables_made != TRUE)
-	//{
+	if (wave_tables_made != TRUE)
+	{
 		MakeWaveTables();
-	//	wave_tables_made = TRUE;
-	//}
+		wave_tables_made = TRUE;
+	}
 
 	memset(envelopeTable, 0, sizeof(envelopeTable));
 
@@ -157,12 +164,12 @@ ATTRIBUTE_HOT BOOL MakePixelWaveData(const PIXTONEPARAMETER *ptp, unsigned char 
 		         + 128;
 
 		if (gWaveModelTable[ptp->oPitch.model][b] < 0)
-			dMain = d1 - d1 * 0.5 * -gWaveModelTable[ptp->oPitch.model][b] * ptp->oPitch.top / 64.0 / 64.0 + dMain;
+			dMain += d1 - d1 * 0.5 * -gWaveModelTable[ptp->oPitch.model][b] * ptp->oPitch.top / 64.0 / 64.0;
 		else
-			dMain = d1 + d1 * 2.0 * gWaveModelTable[ptp->oPitch.model][b] * ptp->oPitch.top / 64.0 / 64.0 + dMain;
+			dMain += d1 + d1 * 2.0 * gWaveModelTable[ptp->oPitch.model][b] * ptp->oPitch.top / 64.0 / 64.0;
 
-		dPitch = dPitch + d2;
-		dVolume = dVolume + d3;
+		dPitch += d2;
+		dVolume += d3;
 	}
 
 	return TRUE;

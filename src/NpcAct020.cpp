@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -5,6 +12,7 @@
 #include "WindowsWrapper.h"
 
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Game.h"
 #include "Frame.h"
 #include "MyChar.h"
@@ -803,7 +811,7 @@ void ActNpc030(NPCHAR *npc)
 		if (++npc->act_wait > 100)
 		{
 			npc->act_wait = 0;
-			SetCaret(npc->x, npc->y - (2 * 0x200), 5, 0);
+			SetCaret(npc->x, npc->y - (2 * 0x200), CARET_ZZZ, DIR_LEFT);
 		}
 	}
 
@@ -970,7 +978,7 @@ void ActNpc033(NPCHAR *npc)
 {
 	if (npc->flag & 5)
 	{
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 		npc->cond = 0;
 	}
 	else if (npc->flag & 8)
@@ -1000,7 +1008,7 @@ void ActNpc033(NPCHAR *npc)
 
 	if (++npc->act_wait > 250)
 	{
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 		npc->cond = 0;
 	}
 }
@@ -1240,7 +1248,7 @@ void ActNpc036(NPCHAR *npc)
 
 	if (npc->act_no != 5)
 	{
-		npc->ym += 0x33;
+		npc->ym += 0x200 / 10;
 
 		if (npc->x < gMC.x)
 			npc->direct = 2;

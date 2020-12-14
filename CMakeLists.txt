@@ -14,12 +14,15 @@ set(ASSETS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
 option(JAPANESE "Enable the Japanese-language build (instead of the unofficial Aeon Genesis English translation)" OFF)
 option(FIX_BUGS "Fix various bugs in the game" ON)
+option(FIX_MAJOR_BUGS "Fix bugs that invoke undefined behaviour or cause memory leaks" ON)
 option(DEBUG_SAVE "Re-enable the ability to drag-and-drop save files onto the window" OFF)
+option(LANCZOS_RESAMPLER "Use Lanczos filtering for audio resampling instead of linear-interpolation (Lanczos is more performance-intensive, but higher quality)" OFF)
+option(FREETYPE_FONTS "Use FreeType2 to render the DejaVu Mono (English) or Migu1M (Japanese) fonts, instead of using pre-rendered copies of Courier New (English) and MS Gothic (Japanese)" ON)
 option(EXTRA_SOUND_FORMATS "Adds support for extra music/SFX formats using the clownaudio library (use the CLOWNAUDIO options to toggle specific formats)" ON)
 
-set(BACKEND_RENDERER "SDLTexture" CACHE STRING "Which renderer the game should use: 'OpenGL3' for an OpenGL 3.2 renderer, 'OpenGLES2' for an OpenGL ES 2.0 renderer, 'SDLTexture' for SDL2's hardware-accelerated Texture API, 'Wii U' for the Wii U's hardware-accelerated GX2 API, or 'Software' for a handwritten software renderer")
-set(BACKEND_AUDIO "SDL2" CACHE STRING "Which audio backend the game should use: 'SDL2', 'miniaudio', 'WiiU-Hardware', 'WiiU-Software', or 'Null'")
-set(BACKEND_PLATFORM "SDL2" CACHE STRING "Which platform backend the game should use: 'SDL2', 'GLFW3', 'WiiU', or 'Null'")
+set(BACKEND_RENDERER "SDLTexture" CACHE STRING "Which renderer the game should use: 'OpenGL3' for an OpenGL 3.2 renderer, 'OpenGLES2' for an OpenGL ES 2.0 renderer, 'SDLTexture' for SDL2's hardware-accelerated Texture API, 'Wii U' for the Wii U's hardware-accelerated GX2 API, '3DS' for the 3DS's hardware accelerated Citro2D/Citro3D API, or 'Software' for a handwritten software renderer")
+set(BACKEND_AUDIO "SDL2" CACHE STRING "Which audio backend the game should use: 'SDL2', 'SDL1', 'miniaudio', 'WiiU-Hardware', 'WiiU-Software', '3DS-Hardware', '3DS-Software', or 'Null'")
+set(BACKEND_PLATFORM "SDL2" CACHE STRING "Which platform backend the game should use: 'SDL2', 'SDL1', 'GLFW3', 'WiiU', '3DS', or 'Null'")
 
 option(LTO "Enable link-time optimisation" OFF)
 option(PKG_CONFIG_STATIC_LIBS "On platforms with pkg-config, static-link the dependencies (good for Windows builds, so you don't need to bundle DLL files)" OFF)
@@ -36,6 +39,7 @@ project(CSE2 LANGUAGES C CXX)
 
 add_executable(CSE2 WIN32
 	"${ASSETS_DIRECTORY}/resources/CSE2.rc"
+	"${ASSETS_DIRECTORY}/resources/CSE2.manifest"
 	"src/ArmsItem.cpp"
 	"src/ArmsItem.h"
 	"src/Back.cpp"
@@ -198,8 +202,20 @@ if(FIX_BUGS)
 	target_compile_definitions(CSE2 PRIVATE FIX_BUGS)
 endif()
 
+if(FIX_BUGS OR FIX_MAJOR_BUGS)
+	target_compile_definitions(CSE2 PRIVATE FIX_MAJOR_BUGS)
+endif()
+
 if(DEBUG_SAVE)
 	target_compile_definitions(CSE2 PRIVATE DEBUG_SAVE)
+endif()
+
+if(LANCZOS_RESAMPLER)
+	target_compile_definitions(CSE2 PRIVATE LANCZOS_RESAMPLER)
+endif()
+
+if(FREETYPE_FONTS)
+	target_compile_definitions(CSE2 PRIVATE FREETYPE_FONTS)
 endif()
 
 if(PKG_CONFIG_STATIC_LIBS)
@@ -235,6 +251,9 @@ elseif(BACKEND_RENDERER MATCHES "SDLTexture")
 	target_sources(CSE2 PRIVATE "src/Backends/Rendering/SDLTexture.cpp")
 elseif(BACKEND_RENDERER MATCHES "WiiU")
 	target_sources(CSE2 PRIVATE "src/Backends/Rendering/WiiU.cpp")
+elseif(BACKEND_RENDERER MATCHES "3DS")
+	target_sources(CSE2 PRIVATE "src/Backends/Rendering/3DS.cpp")
+	target_link_libraries(CSE2 PRIVATE "${CTRU_ROOT}/lib/libcitro2d.a" "${CTRU_ROOT}/lib/libcitro3d.a")
 elseif(BACKEND_RENDERER MATCHES "Software")
 	target_sources(CSE2 PRIVATE "src/Backends/Rendering/Software.cpp")
 else()
@@ -243,15 +262,27 @@ endif()
 
 if(BACKEND_AUDIO MATCHES "SDL2")
 	target_sources(CSE2 PRIVATE
-		"src/Backends/Audio/SDL2.cpp"
 		"src/Backends/Audio/SoftwareMixer.cpp"
-		"src/Backends/Audio/SoftwareMixer.h"
+		"src/Backends/Audio/SoftwareMixer/Mixer.cpp"
+		"src/Backends/Audio/SoftwareMixer/Mixer.h"
+		"src/Backends/Audio/SoftwareMixer/Backend.h"
+		"src/Backends/Audio/SoftwareMixer/SDL2.cpp"
+	)
+elseif(BACKEND_AUDIO MATCHES "SDL1")
+	target_sources(CSE2 PRIVATE
+		"src/Backends/Audio/SoftwareMixer.cpp"
+		"src/Backends/Audio/SoftwareMixer/Mixer.cpp"
+		"src/Backends/Audio/SoftwareMixer/Mixer.h"
+		"src/Backends/Audio/SoftwareMixer/Backend.h"
+		"src/Backends/Audio/SoftwareMixer/SDL1.cpp"
 	)
 elseif(BACKEND_AUDIO MATCHES "miniaudio")
 	target_sources(CSE2 PRIVATE
-		"src/Backends/Audio/miniaudio.cpp"
 		"src/Backends/Audio/SoftwareMixer.cpp"
-		"src/Backends/Audio/SoftwareMixer.h"
+		"src/Backends/Audio/SoftwareMixer/Mixer.cpp"
+		"src/Backends/Audio/SoftwareMixer/Mixer.h"
+		"src/Backends/Audio/SoftwareMixer/Backend.h"
+		"src/Backends/Audio/SoftwareMixer/miniaudio.cpp"
 	)
 
 	# Link libdl, libm, and libpthread
@@ -270,13 +301,27 @@ elseif(BACKEND_AUDIO MATCHES "miniaudio")
 	target_link_libraries(CSE2 PRIVATE ${CMAKE_DL_LIBS})
 elseif(BACKEND_AUDIO MATCHES "WiiU-Hardware")
 	target_sources(CSE2 PRIVATE
-		"src/Backends/Audio/WiiU-Hardware.cpp"
+		"src/Backends/Audio/WiiU.cpp"
 	)
 elseif(BACKEND_AUDIO MATCHES "WiiU-Software")
 	target_sources(CSE2 PRIVATE
-		"src/Backends/Audio/WiiU-Software.cpp"
 		"src/Backends/Audio/SoftwareMixer.cpp"
-		"src/Backends/Audio/SoftwareMixer.h"
+		"src/Backends/Audio/SoftwareMixer/Mixer.cpp"
+		"src/Backends/Audio/SoftwareMixer/Mixer.h"
+		"src/Backends/Audio/SoftwareMixer/Backend.h"
+		"src/Backends/Audio/SoftwareMixer/WiiU.cpp"
+	)
+elseif(BACKEND_AUDIO MATCHES "3DS-Hardware")
+	target_sources(CSE2 PRIVATE
+		"src/Backends/Audio/3DS.cpp"
+	)
+elseif(BACKEND_AUDIO MATCHES "3DS-Software")
+	target_sources(CSE2 PRIVATE
+		"src/Backends/Audio/SoftwareMixer.cpp"
+		"src/Backends/Audio/SoftwareMixer/Mixer.cpp"
+		"src/Backends/Audio/SoftwareMixer/Mixer.h"
+		"src/Backends/Audio/SoftwareMixer/Backend.h"
+		"src/Backends/Audio/SoftwareMixer/3DS.cpp"
 	)
 elseif(BACKEND_AUDIO MATCHES "Null")
 	target_sources(CSE2 PRIVATE
@@ -288,9 +333,15 @@ endif()
 
 if(BACKEND_PLATFORM MATCHES "SDL2")
 	target_sources(CSE2 PRIVATE
-		"src/Backends/Controller/SDL2.cpp"
+		"src/Backends/Controller/SDL.cpp"
 		"src/Backends/Platform/SDL2.cpp"
-		"src/Backends/Shared/SDL2.h"
+		"src/Backends/Shared/SDL.h"
+	)
+elseif(BACKEND_PLATFORM MATCHES "SDL1")
+	target_sources(CSE2 PRIVATE
+		"src/Backends/Controller/SDL.cpp"
+		"src/Backends/Platform/SDL1.cpp"
+		"src/Backends/Shared/SDL.h"
 	)
 elseif(BACKEND_PLATFORM MATCHES "GLFW3")
 	target_sources(CSE2 PRIVATE
@@ -302,6 +353,11 @@ elseif(BACKEND_PLATFORM MATCHES "WiiU")
 	target_sources(CSE2 PRIVATE
 		"src/Backends/Controller/WiiU.cpp"
 		"src/Backends/Platform/WiiU.cpp"
+	)
+elseif(BACKEND_PLATFORM MATCHES "3DS")
+	target_sources(CSE2 PRIVATE
+		"src/Backends/Controller/3DS.cpp"
+		"src/Backends/Platform/3DS.cpp"
 	)
 elseif(BACKEND_PLATFORM MATCHES "Null")
 	target_sources(CSE2 PRIVATE
@@ -317,6 +373,10 @@ elseif(BACKEND_PLATFORM MATCHES "SDL2" AND BACKEND_RENDERER MATCHES "OpenGLES2")
 elseif(BACKEND_PLATFORM MATCHES "SDL2" AND BACKEND_RENDERER MATCHES "SDLTexture")
 elseif(BACKEND_PLATFORM MATCHES "SDL2" AND BACKEND_RENDERER MATCHES "Software")
 	target_sources(CSE2 PRIVATE "src/Backends/Rendering/Window/Software/SDL2.cpp")
+elseif(BACKEND_PLATFORM MATCHES "SDL1" AND BACKEND_RENDERER MATCHES "OpenGL3")
+	target_sources(CSE2 PRIVATE "src/Backends/Rendering/Window/OpenGL3/SDL1.cpp")
+elseif(BACKEND_PLATFORM MATCHES "SDL1" AND BACKEND_RENDERER MATCHES "Software")
+	target_sources(CSE2 PRIVATE "src/Backends/Rendering/Window/Software/SDL1.cpp")
 elseif(BACKEND_PLATFORM MATCHES "GLFW3" AND BACKEND_RENDERER MATCHES "OpenGL3")
 	target_sources(CSE2 PRIVATE "src/Backends/Rendering/Window/OpenGL3/GLFW3.cpp")
 elseif(BACKEND_PLATFORM MATCHES "GLFW3" AND BACKEND_RENDERER MATCHES "OpenGLES2")
@@ -326,6 +386,9 @@ elseif(BACKEND_PLATFORM MATCHES "GLFW3" AND BACKEND_RENDERER MATCHES "Software")
 elseif(BACKEND_PLATFORM MATCHES "WiiU" AND BACKEND_RENDERER MATCHES "WiiU")
 elseif(BACKEND_PLATFORM MATCHES "WiiU" AND BACKEND_RENDERER MATCHES "Software")
 	target_sources(CSE2 PRIVATE "src/Backends/Rendering/Window/Software/WiiU.cpp")
+elseif(BACKEND_PLATFORM MATCHES "3DS" AND BACKEND_RENDERER MATCHES "3DS")
+elseif(BACKEND_PLATFORM MATCHES "3DS" AND BACKEND_RENDERER MATCHES "Software")
+	target_sources(CSE2 PRIVATE "src/Backends/Rendering/Window/Software/3DS.cpp")
 elseif(BACKEND_PLATFORM MATCHES "Null" AND BACKEND_RENDERER MATCHES "Software")
 	target_sources(CSE2 PRIVATE "src/Backends/Rendering/Window/Software/Null.cpp")
 else()
@@ -383,12 +446,14 @@ set_target_properties(CSE2 PROPERTIES
 	C_EXTENSIONS OFF
 )
 
-# Force strict C++11
-set_target_properties(CSE2 PROPERTIES
-	CXX_STANDARD 11
-	CXX_STANDARD_REQUIRED ON
-	CXX_EXTENSIONS OFF
-)
+if(NOT BACKEND_PLATFORM MATCHES "WiiU" AND NOT BACKEND_PLATFORM MATCHES "3DS")
+	# Force strict C++98
+	set_target_properties(CSE2 PROPERTIES
+		CXX_STANDARD 98
+		CXX_STANDARD_REQUIRED ON
+		CXX_EXTENSIONS OFF
+	)
+endif()
 
 # Name debug builds "CSE2_debug", to distinguish them
 set_target_properties(CSE2 PROPERTIES DEBUG_OUTPUT_NAME "CSE2_debug")
@@ -449,7 +514,7 @@ endif()
 
 if(BACKEND_PLATFORM MATCHES "SDL2" OR BACKEND_AUDIO MATCHES "SDL2")
 	if(NOT FORCE_LOCAL_LIBS)
-		find_package(SDL2 2.0.6)
+		find_package(SDL2)
 
 		if (PKG_CONFIG_FOUND)
 			pkg_check_modules(sdl2 QUIET IMPORTED_TARGET sdl2)
@@ -500,41 +565,82 @@ if(BACKEND_PLATFORM MATCHES "SDL2" OR BACKEND_AUDIO MATCHES "SDL2")
 	endif()
 endif()
 
-if(NOT FORCE_LOCAL_LIBS)
-	find_package(Freetype)
+if(BACKEND_PLATFORM MATCHES "SDL1" OR BACKEND_AUDIO MATCHES "SDL1")
+	if(BACKEND_PLATFORM MATCHES "SDL2" OR BACKEND_AUDIO MATCHES "SDL2")
+		message(FATAL_ERROR "SDL1 and SDL2 cannot be used simultaneously!")
+	endif()
+
+	find_package(SDL 1.2.15)
 
 	if (PKG_CONFIG_FOUND)
-		pkg_check_modules(freetype2 QUIET IMPORTED_TARGET freetype2)
+		pkg_check_modules(sdl QUIET IMPORTED_TARGET sdl)
+	endif()
+
+	if(TARGET PkgConfig::sdl)
+		# pkg-config
+		if (PKG_CONFIG_STATIC_LIBS)
+			message(STATUS "Using system SDL1 (pkg-config, static)")
+			# Do not link libSDLmain.a, otherwise we get weird linker errors about SDL_main not being found.
+			# We don't need SDL's WinMain->main shim anyway, so we can just ignore it.
+			list(REMOVE_ITEM sdl_STATIC_CFLAGS "-Dmain=SDL_main")
+			list(REMOVE_ITEM sdl_STATIC_LDFLAGS "-lSDLmain")
+			target_compile_options(CSE2 PRIVATE ${sdl_STATIC_CFLAGS})
+			target_link_libraries(CSE2 PRIVATE ${sdl_STATIC_LDFLAGS})
+		else()
+			message(STATUS "Using system SDL1 (pkg-config, dynamic)")
+			# Do not link libSDLmain.a, otherwise we get weird linker errors about SDL_main not being found.
+			# We don't need SDL's WinMain->main shim anyway, so we can just ignore it.
+			list(REMOVE_ITEM sdl_CFLAGS "-Dmain=SDL_main")
+			list(REMOVE_ITEM sdl_LDFLAGS "-lSDLmain")
+			target_compile_options(CSE2 PRIVATE ${sdl_CFLAGS})
+			target_link_libraries(CSE2 PRIVATE ${sdl_LDFLAGS})
+		endif()
+	elseif(SDL_FOUND)
+		message(STATUS "Using system SDL1 (CMake)")
+		target_include_directories(CSE2 PRIVATE ${SDL_INCLUDE_DIR})
+		target_link_libraries(CSE2 PRIVATE ${SDL_LIBRARY})
+	else()
+		message(FATAL_ERROR "SDL1 not installed!")
 	endif()
 endif()
 
-if(TARGET PkgConfig::freetype2)
-	# pkg-config
-	if (PKG_CONFIG_STATIC_LIBS)
-		message(STATUS "Using system FreeType (pkg-config, static)")
-		target_compile_options(CSE2 PRIVATE ${freetype2_STATIC_CFLAGS})
-		target_link_libraries(CSE2 PRIVATE ${freetype2_STATIC_LDFLAGS})
+if(FREETYPE_FONTS)
+	if(NOT FORCE_LOCAL_LIBS)
+		find_package(Freetype)
+
+		if (PKG_CONFIG_FOUND)
+			pkg_check_modules(freetype2 QUIET IMPORTED_TARGET freetype2)
+		endif()
+	endif()
+
+	if(TARGET PkgConfig::freetype2)
+		# pkg-config
+		if (PKG_CONFIG_STATIC_LIBS)
+			message(STATUS "Using system FreeType (pkg-config, static)")
+			target_compile_options(CSE2 PRIVATE ${freetype2_STATIC_CFLAGS})
+			target_link_libraries(CSE2 PRIVATE ${freetype2_STATIC_LDFLAGS})
+		else()
+			message(STATUS "Using system FreeType (pkg-config, dynamic)")
+			target_compile_options(CSE2 PRIVATE ${freetype2_CFLAGS})
+			target_link_libraries(CSE2 PRIVATE ${freetype2_LDFLAGS})
+		endif()
+	elseif(FREETYPE_FOUND)
+		message(STATUS "Using system FreeType (CMake)")
+		target_include_directories(CSE2 PRIVATE ${FREETYPE_INCLUDE_DIRS})
+		target_link_libraries(CSE2 PRIVATE ${FREETYPE_LIBRARIES})
 	else()
-		message(STATUS "Using system FreeType (pkg-config, dynamic)")
-		target_compile_options(CSE2 PRIVATE ${freetype2_CFLAGS})
-		target_link_libraries(CSE2 PRIVATE ${freetype2_LDFLAGS})
+		# Compile it ourselves
+		message(STATUS "Using local FreeType")
+		if(FORCE_LOCAL_LIBS)
+			set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz ON CACHE INTERNAL "" FORCE)
+			set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB ON CACHE INTERNAL "" FORCE)
+			set(CMAKE_DISABLE_FIND_PACKAGE_PNG ON CACHE INTERNAL "" FORCE)
+			set(CMAKE_DISABLE_FIND_PACKAGE_BZip2 ON CACHE INTERNAL "" FORCE)
+			set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec ON CACHE INTERNAL "" FORCE)
+		endif()
+		add_subdirectory("external/freetype" EXCLUDE_FROM_ALL)
+		target_link_libraries(CSE2 PRIVATE freetype)
 	endif()
-elseif(FREETYPE_FOUND)
-	message(STATUS "Using system FreeType (CMake)")
-	target_include_directories(CSE2 PRIVATE ${FREETYPE_INCLUDE_DIRS})
-	target_link_libraries(CSE2 PRIVATE ${FREETYPE_LIBRARIES})
-else()
-	# Compile it ourselves
-	message(STATUS "Using local FreeType")
-	if(FORCE_LOCAL_LIBS)
-		set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz ON CACHE INTERNAL "" FORCE)
-		set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB ON CACHE INTERNAL "" FORCE)
-		set(CMAKE_DISABLE_FIND_PACKAGE_PNG ON CACHE INTERNAL "" FORCE)
-		set(CMAKE_DISABLE_FIND_PACKAGE_BZip2 ON CACHE INTERNAL "" FORCE)
-		set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec ON CACHE INTERNAL "" FORCE)
-	endif()
-	add_subdirectory("external/freetype" EXCLUDE_FROM_ALL)
-	target_link_libraries(CSE2 PRIVATE freetype)
 endif()
 
 if(BACKEND_RENDERER MATCHES "OpenGL3")

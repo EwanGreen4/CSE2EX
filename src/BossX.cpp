@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "BossX.h"
 
 #include <stddef.h>
@@ -844,7 +851,7 @@ void ActBossChar_MonstX(void)
 			{
 				npc->act_wait = 0;
 				npc->act_no = 1001;
-				SetFlash(npc->x, npc->y, 1);
+				SetFlash(npc->x, npc->y, FLASH_MODE_EXPLOSION);
 				PlaySoundObject(35, SOUND_MODE_PLAY);
 			}
 

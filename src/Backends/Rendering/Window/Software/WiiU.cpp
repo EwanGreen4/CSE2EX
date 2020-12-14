@@ -1,3 +1,6 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 // Sexy new backend that bounces the software-rendered frame to the GPU,
 // eliminating V-tearing, and gaining support for rendering to the TV for
 // free!
@@ -48,7 +51,7 @@ static GX2Texture screen_texture;
 static Viewport tv_viewport;
 static Viewport drc_viewport;
 
-static void CalculateViewport(unsigned int actual_screen_width, unsigned int actual_screen_height, Viewport *viewport)
+static void CalculateViewport(size_t actual_screen_width, size_t actual_screen_height, Viewport *viewport)
 {
 	if (actual_screen_width * fake_framebuffer_height > fake_framebuffer_width * actual_screen_height) // Fancy way to do `if (actual_screen_width / actual_screen_height > fake_framebuffer_width / fake_framebuffer_height)` without floats
 	{
@@ -68,7 +71,7 @@ static void CalculateViewport(unsigned int actual_screen_width, unsigned int act
 	}
 }
 
-bool WindowBackend_Software_CreateWindow(const char *window_title, int screen_width, int screen_height, bool fullscreen, bool *vsync)
+bool WindowBackend_Software_CreateWindow(const char *window_title, size_t screen_width, size_t screen_height, bool fullscreen, bool *vsync)
 {
 	(void)window_title;
 	(void)fullscreen;
@@ -244,7 +247,7 @@ ATTRIBUTE_HOT void WindowBackend_Software_Display(void)
 	WHBGfxFinishRender();
 }
 
-void WindowBackend_Software_HandleWindowResize(unsigned int width, unsigned int height)
+void WindowBackend_Software_HandleWindowResize(size_t width, size_t height)
 {
 	(void)width;
 	(void)height;

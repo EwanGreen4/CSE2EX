@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "Game.h"
 
 #include <stddef.h>
@@ -659,7 +666,7 @@ static int ModeAction(void)
 			ActBullet();
 			ActCaret();
 			MoveFrame3();
-#ifdef FIX_BUGS
+#ifdef FIX_MAJOR_BUGS
 			// ActFlash uses frame_x and frame_y uninitialised
 			GetFramePosition(&frame_x, &frame_y);
 #endif
@@ -787,12 +794,11 @@ BOOL Game(void)
 
 	if (!LoadGenericData())
 	{
-#ifdef JAPANESE
-		Backend_ShowMessageBox("エラー", "汎用ファイルが読めない");
-#else
+	#if !defined(JAPANESE) && defined(FIX_BUGS) // The Aeon Genesis translation didn't translate this
 		Backend_ShowMessageBox("Error", "Couldn't read general purpose files");
-#endif
-
+	#else
+		Backend_ShowMessageBox("エラー", "汎用ファイルが読めない");
+	#endif
 		return FALSE;
 	}
 
@@ -802,12 +808,11 @@ BOOL Game(void)
 
 	if (!LoadNpcTable(path.c_str()))
 	{
-#ifdef JAPANESE
-		Backend_ShowMessageBox("エラー", "NPCテーブルが読めない");
-#else
+	#if !defined(JAPANESE) && defined(FIX_BUGS) // The Aeon Genesis translation didn't translate this
 		Backend_ShowMessageBox("Error", "Couldn't read the NPC table");
-#endif
-
+	#else
+		Backend_ShowMessageBox("エラー", "NPCテーブルが読めない");
+	#endif
 		return FALSE;
 	}
 

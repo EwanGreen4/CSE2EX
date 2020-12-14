@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -432,7 +439,7 @@ void ActNpc340(NPCHAR *npc)
 			npc->direct = 2;
 
 			if (++npc->act_wait == 40)
-				SetFlash(0, 0, 2);
+				SetFlash(0, 0, FLASH_MODE_FLASH);
 
 			if (npc->act_wait > 50 && npc->act_wait % 10 == 1)
 			{
@@ -513,7 +520,7 @@ void ActNpc340(NPCHAR *npc)
 				npc->ym = 0;
 				npc->act_no = 1005;
 				npc->act_wait = 0;
-				SetFlash(0, 0, 2);
+				SetFlash(0, 0, FLASH_MODE_FLASH);
 				PlaySoundObject(29, SOUND_MODE_PLAY);
 			}
 
@@ -1917,7 +1924,7 @@ void ActNpc357(NPCHAR *npc)
 	}
 
 	if (npc->act_wait % 8 == 1)
-		SetCaret(npc->x + (Random(-8, 8) * 0x200), npc->y + 0x1000, 13, 1);
+		SetCaret(npc->x + (Random(-8, 8) * 0x200), npc->y + 0x1000, CARET_TINY_PARTICLES, DIR_UP);
 }
 
 // Misery (stood in the wind during the credits)

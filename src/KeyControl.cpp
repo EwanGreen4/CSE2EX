@@ -1,10 +1,17 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "KeyControl.h"
 
 #include "Backends/Misc.h"
 #include "Input.h"
 
 bool gKeyboardState[BACKEND_KEYBOARD_TOTAL];
-JOYSTICK_STATUS gJoystickState;
+DIRECTINPUTSTATUS gJoystickState;
 
 long gKey;
 long gKeyTrg;

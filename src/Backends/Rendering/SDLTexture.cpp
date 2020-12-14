@@ -1,3 +1,6 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "../Rendering.h"
 
 #include <stddef.h>
@@ -7,44 +10,43 @@
 
 #include "SDL.h"
 
-#define SPRITEBATCH_IMPLEMENTATION
-#include "../../../external/cute_spritebatch.h"
-
 #include "../../WindowsWrapper.h"
 
 #include "../Misc.h"
-#include "../Shared/SDL2.h"
+#include "../Shared/SDL.h"
+
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
 
 typedef struct RenderBackend_Surface
 {
 	SDL_Texture *texture;
-	unsigned char *pixels;
-	unsigned int width;
-	unsigned int height;
+	size_t width;
+	size_t height;
+	bool render_target;
 	bool lost;
 
 	struct RenderBackend_Surface *next;
 	struct RenderBackend_Surface *prev;
 } RenderBackend_Surface;
 
-typedef struct RenderBackend_Glyph
+typedef struct RenderBackend_GlyphAtlas
 {
-	unsigned char *pixels;
-	unsigned int width;
-	unsigned int height;
-} RenderBackend_Glyph;
+	SDL_Texture *texture;
+} RenderBackend_GlyphAtlas;
 
 SDL_Window *window;
 
 static SDL_Renderer *renderer;
 
 static RenderBackend_Surface framebuffer;
+static RenderBackend_Surface upscaled_framebuffer;
+
+static SDL_Rect window_rect;
 
 static RenderBackend_Surface *surface_list_head;
 
-static unsigned char glyph_colour_channels[3];
-
-static spritebatch_t glyph_batcher;
+static RenderBackend_GlyphAtlas *glyph_atlas;
 
 static SDL_BlendMode premultiplied_blend_mode;
 
@@ -62,68 +64,7 @@ static void RectToSDLRect(const RenderBackend_Rect *rect, SDL_Rect *sdl_rect)
 		sdl_rect->h = 0;
 }
 
-// Blit the glyphs in the batch
-static void GlyphBatch_Draw(spritebatch_sprite_t *sprites, int count, int texture_w, int texture_h, void *udata)
-{
-	(void)udata;
-
-	SDL_Texture *texture_atlas = (SDL_Texture*)sprites[0].texture_id;
-
-	// The SDL_Texture side of things uses alpha, not a colour-key, so the bug where the font is blended
-	// with the colour key doesn't occur.
-	if (SDL_SetTextureColorMod(texture_atlas, glyph_colour_channels[0], glyph_colour_channels[1], glyph_colour_channels[2]) < 0)
-		Backend_PrintError("Couldn't set additional color value: %s", SDL_GetError());
-
-	if (SDL_SetTextureBlendMode(texture_atlas, premultiplied_blend_mode) < 0)
-		Backend_PrintError("Couldn't set texture blend mode: %s", SDL_GetError());
-
-	for (int i = 0; i < count; ++i)
-	{
-		RenderBackend_Glyph *glyph = (RenderBackend_Glyph*)sprites[i].image_id;
-
-		SDL_Rect source_rect = {(int)(texture_w * sprites[i].minx), (int)(texture_h * sprites[i].maxy), (int)glyph->width, (int)glyph->height};
-		SDL_Rect destination_rect = {(int)sprites[i].x, (int)sprites[i].y, (int)glyph->width, (int)glyph->height};
-
-		if (SDL_RenderCopy(renderer, texture_atlas, &source_rect, &destination_rect) < 0)
-			Backend_PrintError("Couldn't copy glyph texture portion to renderer: %s", SDL_GetError());
-	}
-}
-
-// Upload the glyph's pixels
-static void GlyphBatch_GetPixels(SPRITEBATCH_U64 image_id, void *buffer, int bytes_to_fill, void *udata)
-{
-	(void)udata;
-
-	RenderBackend_Glyph *glyph = (RenderBackend_Glyph*)image_id;
-
-	memcpy(buffer, glyph->pixels, bytes_to_fill);
-}
-
-// Create a texture atlas, and upload pixels to it
-static SPRITEBATCH_U64 GlyphBatch_CreateTexture(void *pixels, int w, int h, void *udata)
-{
-	(void)udata;
-
-	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, w, h);
-
-	if (texture == NULL)
-		Backend_PrintError("Couldn't create texture for renderer: %s", SDL_GetError());
-
-	if (SDL_UpdateTexture(texture, NULL, pixels, w * 4) < 0)
-		Backend_PrintError("Couldn't update texture: %s", SDL_GetError());
-
-	return (SPRITEBATCH_U64)texture;
-}
-
-// Destroy texture atlas
-static void GlyphBatch_DestroyTexture(SPRITEBATCH_U64 texture_id, void *udata)
-{
-	(void)udata;
-
-	SDL_DestroyTexture((SDL_Texture*)texture_id);
-}
-
-RenderBackend_Surface* RenderBackend_Init(const char *window_title, int screen_width, int screen_height, bool fullscreen, bool *vsync)
+RenderBackend_Surface* RenderBackend_Init(const char *window_title, size_t screen_width, size_t screen_height, bool fullscreen, bool *vsync)
 {
 	Backend_PrintInfo("Available SDL render drivers:");
 
@@ -158,39 +99,23 @@ RenderBackend_Surface* RenderBackend_Init(const char *window_title, int screen_w
 			else
 				Backend_PrintInfo("Selected SDL render driver: %s", info.name);
 
-			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 			framebuffer.texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, screen_width, screen_height);
-			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
 
 			if (framebuffer.texture != NULL)
 			{
+				SDL_SetTextureBlendMode(framebuffer.texture, SDL_BLENDMODE_NONE);
+
 				framebuffer.width = screen_width;
 				framebuffer.height = screen_height;
 
 				// Set up our premultiplied-alpha blend mode
 				premultiplied_blend_mode = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD);
 
-				// Set-up glyph-batcher
-				spritebatch_config_t config;
-				spritebatch_set_default_config(&config);
-				config.pixel_stride = 4;
-				config.atlas_width_in_pixels = 256;
-				config.atlas_height_in_pixels = 256;
-				config.lonely_buffer_count_till_flush = 4; // Start making atlases immediately
-				config.batch_callback = GlyphBatch_Draw;
-				config.get_pixels_callback = GlyphBatch_GetPixels;
-				config.generate_texture_callback = GlyphBatch_CreateTexture;
-				config.delete_texture_callback = GlyphBatch_DestroyTexture;
-				if (spritebatch_init(&glyph_batcher, &config, NULL) == 0)
-				{
-					Backend_PostWindowCreation();
+				RenderBackend_HandleWindowResize(screen_width, screen_height);
 
-					return &framebuffer;
-				}
-				else
-				{
-					Backend_ShowMessageBox("Fatal error (SDLTexture rendering backend)", "Failed to initialize spritebatch");
-				}
+				Backend_PostWindowCreation();
+
+				return &framebuffer;
 			}
 			else
 			{
@@ -220,7 +145,9 @@ RenderBackend_Surface* RenderBackend_Init(const char *window_title, int screen_w
 
 void RenderBackend_Deinit(void)
 {
-	spritebatch_term(&glyph_batcher);
+	if (upscaled_framebuffer.texture != NULL)
+		SDL_DestroyTexture(upscaled_framebuffer.texture);
+
 	SDL_DestroyTexture(framebuffer.texture);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
@@ -228,50 +155,37 @@ void RenderBackend_Deinit(void)
 
 void RenderBackend_DrawScreen(void)
 {
-	spritebatch_tick(&glyph_batcher);
+	if (upscaled_framebuffer.texture != NULL)
+	{
+		if (SDL_SetRenderTarget(renderer, upscaled_framebuffer.texture) < 0)
+			Backend_PrintError("Couldn't set upscaled framebuffer as the current rendering target: %s", SDL_GetError());
+
+		if (SDL_RenderCopy(renderer, framebuffer.texture, NULL, NULL) < 0)
+			Backend_PrintError("Failed to copy framebuffer texture to upscaled framebuffer: %s", SDL_GetError());
+	}
 
 	if (SDL_SetRenderTarget(renderer, NULL) < 0)
 		Backend_PrintError("Couldn't set default render target as the current rendering target: %s", SDL_GetError());
 
-	int renderer_width, renderer_height;
-	SDL_GetRendererOutputSize(renderer, &renderer_width, &renderer_height);
+	if (SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xFF) < 0)
+		Backend_PrintError("Couldn't set color for drawing operations: %s", SDL_GetError());
 
-	int texture_width, texture_height;
-	SDL_QueryTexture(framebuffer.texture, NULL, NULL, &texture_width, &texture_height);
-
-	SDL_Rect dst_rect;
-	if ((float)renderer_width / texture_width < (float)renderer_height / texture_height)
-	{
-		dst_rect.w = renderer_width;
-		dst_rect.h = (int)(texture_height * (float)renderer_width / texture_width);
-		dst_rect.x = 0;
-		dst_rect.y = (renderer_height - dst_rect.h) / 2;
-	}
-	else
-	{
-		dst_rect.w = (int)(texture_width * (float)renderer_height / texture_height);
-		dst_rect.h = renderer_height;
-		dst_rect.x = (renderer_width - dst_rect.w) / 2;
-		dst_rect.y = 0;
-	}
-
-	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(renderer);
 
-	if (SDL_RenderCopy(renderer, framebuffer.texture, NULL, &dst_rect) < 0)
-		Backend_PrintError("Failed to copy framebuffer texture to default render target: %s", SDL_GetError());
+	if (SDL_RenderCopy(renderer, upscaled_framebuffer.texture != NULL ? upscaled_framebuffer.texture : framebuffer.texture, NULL, &window_rect) < 0)
+		Backend_PrintError("Failed to copy upscaled framebuffer texture to default render target: %s", SDL_GetError());
 
 	SDL_RenderPresent(renderer);
 }
 
-RenderBackend_Surface* RenderBackend_CreateSurface(unsigned int width, unsigned int height, bool render_target)
+RenderBackend_Surface* RenderBackend_CreateSurface(size_t width, size_t height, bool render_target)
 {
 	RenderBackend_Surface *surface = (RenderBackend_Surface*)malloc(sizeof(RenderBackend_Surface));
 
 	if (surface == NULL)
 		return NULL;
 
-	surface->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, render_target ? SDL_TEXTUREACCESS_TARGET : 0, width, height);
+	surface->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, render_target ? SDL_TEXTUREACCESS_TARGET : SDL_TEXTUREACCESS_STATIC, width, height);
 
 	if (surface->texture == NULL)
 	{
@@ -281,6 +195,7 @@ RenderBackend_Surface* RenderBackend_CreateSurface(unsigned int width, unsigned 
 
 	surface->width = width;
 	surface->height = height;
+	surface->render_target = render_target;
 	surface->lost = false;
 
 	// Add to linked-list
@@ -296,14 +211,14 @@ RenderBackend_Surface* RenderBackend_CreateSurface(unsigned int width, unsigned 
 
 void RenderBackend_FreeSurface(RenderBackend_Surface *surface)
 {
-	if (surface == NULL)
-		return;
-
 	// Remove from linked list
 	if (surface->next != NULL)
 		surface->next->prev = surface->prev;
 	if (surface->prev != NULL)
 		surface->prev->next = surface->next;
+
+	if (surface->prev == NULL)
+		surface_list_head = surface->next;
 
 	SDL_DestroyTexture(surface->texture);
 	free(surface);
@@ -319,50 +234,42 @@ void RenderBackend_RestoreSurface(RenderBackend_Surface *surface)
 	surface->lost = false;
 }
 
-unsigned char* RenderBackend_LockSurface(RenderBackend_Surface *surface, unsigned int *pitch, unsigned int width, unsigned int height)
+void RenderBackend_UploadSurface(RenderBackend_Surface *surface, const unsigned char *pixels, size_t width, size_t height)
 {
-	if (surface == NULL)
-		return NULL;
+	unsigned char *buffer = (unsigned char*)malloc(width * height * 4);
 
-	*pitch = width * 4;
-
-	surface->pixels = (unsigned char*)malloc(width * height * 4);
-
-	return surface->pixels;
-}
-
-void RenderBackend_UnlockSurface(RenderBackend_Surface *surface, unsigned int width, unsigned int height)
-{
-	if (surface == NULL)
+	if (buffer == NULL)
+	{
+		Backend_PrintError("Couldn't allocate memory for surface buffer");
 		return;
+	}
+
+	const unsigned char *src_pixel = pixels;
+	unsigned char *buffer_pointer = buffer;
 
 	// Pre-multiply the colour channels with the alpha, so blending works correctly
-	for (unsigned int y = 0; y < height; ++y)
+	for (size_t y = 0; y < height; ++y)
 	{
-		unsigned char *pixels = surface->pixels + y * width * 4;
-
-		for (unsigned int x = 0; x < width; ++x)
+		for (size_t x = 0; x < width; ++x)
 		{
-			pixels[0] = (pixels[0] * pixels[3]) / 0xFF;
-			pixels[1] = (pixels[1] * pixels[3]) / 0xFF;
-			pixels[2] = (pixels[2] * pixels[3]) / 0xFF;
-			pixels += 4;
+			*buffer_pointer++ = (src_pixel[0] * src_pixel[3]) / 0xFF;
+			*buffer_pointer++ = (src_pixel[1] * src_pixel[3]) / 0xFF;
+			*buffer_pointer++ = (src_pixel[2] * src_pixel[3]) / 0xFF;
+			*buffer_pointer++ = src_pixel[3];
+			src_pixel += 4;
 		}
 	}
 
 	SDL_Rect rect = {0, 0, (int)width, (int)height};
 
-	if (SDL_UpdateTexture(surface->texture, &rect, surface->pixels, width * 4) < 0)
+	if (SDL_UpdateTexture(surface->texture, &rect, buffer, width * 4) < 0)
 		Backend_PrintError("Couldn't update part of texture: %s", SDL_GetError());
 
-	free(surface->pixels);
+	free(buffer);
 }
 
 void RenderBackend_Blit(RenderBackend_Surface *source_surface, const RenderBackend_Rect *rect, RenderBackend_Surface *destination_surface, long x, long y, bool alpha_blend)
 {
-	if (source_surface == NULL || destination_surface == NULL)
-		return;
-
 	SDL_Rect source_rect;
 	RectToSDLRect(rect, &source_rect);
 
@@ -381,9 +288,6 @@ void RenderBackend_Blit(RenderBackend_Surface *source_surface, const RenderBacke
 
 void RenderBackend_ColourFill(RenderBackend_Surface *surface, const RenderBackend_Rect *rect, unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha)
 {
-	if (surface == NULL)
-		return;
-
 	SDL_Rect sdl_rect;
 	RectToSDLRect(rect, &sdl_rect);
 
@@ -404,88 +308,150 @@ void RenderBackend_ColourFill(RenderBackend_Surface *surface, const RenderBacken
 		Backend_PrintError("Couldn't enable alpha blending for drawing operations: %s", SDL_GetError());
 }
 
-RenderBackend_Glyph* RenderBackend_LoadGlyph(const unsigned char *pixels, unsigned int width, unsigned int height, int pitch)
+RenderBackend_GlyphAtlas* RenderBackend_CreateGlyphAtlas(size_t width, size_t height)
 {
-	RenderBackend_Glyph *glyph = (RenderBackend_Glyph*)malloc(sizeof(RenderBackend_Glyph));
+	RenderBackend_GlyphAtlas *atlas = (RenderBackend_GlyphAtlas*)malloc(sizeof(RenderBackend_GlyphAtlas));
 
-	if (glyph == NULL)
-		return NULL;
-
-	glyph->pixels = (unsigned char*)malloc(width * height * 4);
-
-	if (glyph->pixels == NULL)
+	if (atlas != NULL)
 	{
-		free(glyph);
-		return NULL;
-	}
+		atlas->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, width, height);
 
-	unsigned char *destination_pointer = glyph->pixels;
-
-	for (unsigned int y = 0; y < height; ++y)
-	{
-		const unsigned char *source_pointer = pixels + y * pitch;
-
-		for (unsigned int x = 0; x < width; ++x)
+		if (atlas->texture != NULL)
 		{
-			const unsigned char alpha = *source_pointer++;
-
-			*destination_pointer++ = alpha;
-			*destination_pointer++ = alpha;
-			*destination_pointer++ = alpha;
-			*destination_pointer++ = alpha;
+			return atlas;
 		}
+		else
+		{
+			Backend_PrintError("Couldn't create texture for renderer: %s", SDL_GetError());
+		}
+
+		free(atlas);
 	}
 
-	glyph->width = width;
-	glyph->height = height;
-
-	return glyph;
+	return NULL;
 }
 
-void RenderBackend_UnloadGlyph(RenderBackend_Glyph *glyph)
+void RenderBackend_DestroyGlyphAtlas(RenderBackend_GlyphAtlas *atlas)
 {
-	if (glyph == NULL)
-		return;
-
-	free(glyph->pixels);
-	free(glyph);
+	SDL_DestroyTexture(atlas->texture);
+	free(atlas);
 }
 
-void RenderBackend_PrepareToDrawGlyphs(RenderBackend_Surface *destination_surface, const unsigned char *colour_channels)
+void RenderBackend_UploadGlyph(RenderBackend_GlyphAtlas *atlas, size_t x, size_t y, const unsigned char *pixels, size_t width, size_t height, size_t pitch)
 {
-	if (destination_surface == NULL)
-		return;
+	unsigned char *buffer = (unsigned char*)malloc(width * height * 4);
+
+	if (buffer != NULL)
+	{
+		unsigned char *destination_pointer = buffer;
+
+		for (size_t iy = 0; iy < height; ++iy)
+		{
+			const unsigned char *source_pointer = &pixels[iy * pitch];
+
+			for (size_t ix = 0; ix < width; ++ix)
+			{
+				const unsigned char alpha = *source_pointer++;
+
+				*destination_pointer++ = alpha;
+				*destination_pointer++ = alpha;
+				*destination_pointer++ = alpha;
+				*destination_pointer++ = alpha;
+			}
+		}
+
+		SDL_Rect rect;
+		rect.x = x;
+		rect.y = y;
+		rect.w = width;
+		rect.h = height;
+
+		if (SDL_UpdateTexture(atlas->texture, &rect, buffer, width * 4) < 0)
+			Backend_PrintError("Couldn't update texture: %s", SDL_GetError());
+
+		free(buffer);
+	}
+}
+
+void RenderBackend_PrepareToDrawGlyphs(RenderBackend_GlyphAtlas *atlas, RenderBackend_Surface *destination_surface, unsigned char red, unsigned char green, unsigned char blue)
+{
+	glyph_atlas = atlas;
 
 	if (SDL_SetRenderTarget(renderer, destination_surface->texture) < 0)
 		Backend_PrintError("Couldn't set texture as current rendering target: %s", SDL_GetError());
 
-	memcpy(glyph_colour_channels, colour_channels, sizeof(glyph_colour_channels));
+	// The SDL_Texture side of things uses alpha, not a colour-key, so the bug where the font is blended
+	// with the colour key doesn't occur.
+	if (SDL_SetTextureColorMod(atlas->texture, red, green, blue) < 0)
+		Backend_PrintError("Couldn't set additional color value: %s", SDL_GetError());
+
+	if (SDL_SetTextureBlendMode(atlas->texture, SDL_BLENDMODE_BLEND) < 0)
+		Backend_PrintError("Couldn't set texture blend mode: %s", SDL_GetError());
+
 }
 
-void RenderBackend_DrawGlyph(RenderBackend_Glyph *glyph, long x, long y)
+void RenderBackend_DrawGlyph(long x, long y, size_t glyph_x, size_t glyph_y, size_t glyph_width, size_t glyph_height)
 {
-	if (spritebatch_push(&glyph_batcher, (SPRITEBATCH_U64)glyph, glyph->width, glyph->height, x, y, 1.0f, 1.0f, 0.0f, 0.0f, 0) != 1)
-		Backend_PrintError("Failed to push glyph to batcher");
-}
+	SDL_Rect source_rect;
+	source_rect.x = glyph_x;
+	source_rect.y = glyph_y;
+	source_rect.w = glyph_width;
+	source_rect.h = glyph_height;
 
-void RenderBackend_FlushGlyphs(void)
-{
-	if (spritebatch_defrag(&glyph_batcher) != 1)
-		Backend_PrintError("Couldn't defrag textures");
+	SDL_Rect destination_rect;
+	destination_rect.x = x;
+	destination_rect.y = y;
+	destination_rect.w = glyph_width;
+	destination_rect.h = glyph_height;
 
-	spritebatch_flush(&glyph_batcher);
+	if (SDL_RenderCopy(renderer, glyph_atlas->texture, &source_rect, &destination_rect) < 0)
+		Backend_PrintError("Couldn't copy glyph texture portion to renderer: %s", SDL_GetError());
 }
 
 void RenderBackend_HandleRenderTargetLoss(void)
 {
 	for (RenderBackend_Surface *surface = surface_list_head; surface != NULL; surface = surface->next)
-		surface->lost = true;
+		if (surface->render_target)
+			surface->lost = true;
 }
 
-void RenderBackend_HandleWindowResize(unsigned int width, unsigned int height)
+void RenderBackend_HandleWindowResize(size_t width, size_t height)
 {
-	(void)width;
-	(void)height;
+	size_t upscale_factor = MAX(1, MIN((width + framebuffer.width / 2) / framebuffer.width, (height + framebuffer.height / 2) / framebuffer.height));
 
-	// No problem for us
+	upscaled_framebuffer.width = framebuffer.width * upscale_factor;
+	upscaled_framebuffer.height = framebuffer.height * upscale_factor;
+
+	if (upscaled_framebuffer.texture != NULL)
+	{
+		SDL_DestroyTexture(upscaled_framebuffer.texture);
+		upscaled_framebuffer.texture = NULL;
+	}
+
+	// Create rect that forces 4:3 no matter what size the window is
+	if (width * upscaled_framebuffer.height >= upscaled_framebuffer.width * height) // Fancy way to do `if (width / height >= upscaled_framebuffer.width / upscaled_framebuffer.height)` without floats
+	{
+		window_rect.w = (height * upscaled_framebuffer.width) / upscaled_framebuffer.height;
+		window_rect.h = height;
+	}
+	else
+	{
+		window_rect.w = width;
+		window_rect.h = (width * upscaled_framebuffer.height) / upscaled_framebuffer.width;
+	}
+
+	window_rect.x = (width - window_rect.w) / 2;
+	window_rect.y = (height - window_rect.h) / 2;
+
+	if (window_rect.w % framebuffer.width != 0 || window_rect.h % framebuffer.height != 0)
+	{
+		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+		upscaled_framebuffer.texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, upscaled_framebuffer.width, upscaled_framebuffer.height);
+		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
+
+		if (upscaled_framebuffer.texture == NULL)
+			Backend_PrintError("Couldn't regenerate upscaled framebuffer");
+
+		SDL_SetTextureBlendMode(upscaled_framebuffer.texture, SDL_BLENDMODE_NONE);
+	}
 }

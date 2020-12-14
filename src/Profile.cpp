@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "Profile.h"
 
 #include <stddef.h>
@@ -44,7 +51,7 @@ BOOL IsProfile(void)
 BOOL SaveProfile(const char *name)
 {
 	FILE *fp;
-	PROFILE profile;
+	PROFILEDATA profile;
 	const char *FLAG = "FLAG";
 
 	std::string path;
@@ -61,7 +68,7 @@ BOOL SaveProfile(const char *name)
 		return FALSE;
 
 	// Set up profile
-	memset(&profile, 0, sizeof(PROFILE));
+	memset(&profile, 0, sizeof(PROFILEDATA));
 	memcpy(profile.code, gProfileCode, sizeof(profile.code));
 	memcpy(profile.FLAG, FLAG, sizeof(profile.FLAG));
 	profile.stage = gStageNo;
@@ -151,7 +158,7 @@ BOOL SaveProfile(const char *name)
 BOOL LoadProfile(const char *name)
 {
 	FILE *fp;
-	PROFILE profile;
+	PROFILEDATA profile;
 	std::string path;
 
 	// Get path
@@ -177,7 +184,7 @@ BOOL LoadProfile(const char *name)
 
 	// Read data
 	fseek(fp, 0, SEEK_SET);
-	memset(&profile, 0, sizeof(PROFILE));
+	memset(&profile, 0, sizeof(PROFILEDATA));
 	fread(profile.code, 8, 1, fp);
 	profile.stage = File_ReadLE32(fp);
 	profile.music = (MusicID)File_ReadLE32(fp);
@@ -312,12 +319,11 @@ BOOL InitializeGame(void)
 	InitFlags();
 	if (!TransferStage(13, 200, 10, 8))
 	{
-#ifdef JAPANESE
-		Backend_ShowMessageBox("エラー", "ステージの読み込みに失敗");
-#else
+	#if !defined(JAPANESE) && defined(FIX_BUGS) // The Aeon Genesis translation didn't translate this
 		Backend_ShowMessageBox("Error", "Failed to load stage");
-#endif
-
+	#else
+		Backend_ShowMessageBox("エラー", "ステージの読み込みに失敗");
+	#endif
 		return FALSE;
 	}
 

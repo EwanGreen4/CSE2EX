@@ -14,6 +14,7 @@
 #include "Config.h"
 #include "Draw.h"
 #include "Escape.h"
+#include "Generic.h"
 #include "KeyControl.h"
 #include "Main.h"
 #include "Organya.h"
@@ -305,6 +306,28 @@ static const char* GetKeyName(int key)
 	return "Unknown";
 }
 
+static void PutTextCentred(int x, int y, const char *text, unsigned long color)
+{
+	size_t string_width = 0;
+	size_t string_height = font_height;
+
+	for (const char *text_pointer = text; *text_pointer != '\0';)
+	{
+		if (IsShiftJIS(*text_pointer))
+		{
+			text_pointer += 2;
+			string_width += font_width * 2;
+		}
+		else
+		{
+			text_pointer += 1;
+			string_width += font_width;
+		}
+	}
+
+	PutText(x - string_width / 2, y - string_height / 2, text, color);
+}
+
 static int EnterOptionsMenu(OptionsMenu *options_menu, size_t selected_option)
 {
 	int scroll = 0;
@@ -399,11 +422,11 @@ static int EnterOptionsMenu(OptionsMenu *options_menu, size_t selected_option)
 		int y = (WINDOW_HEIGHT / 2) - ((visible_options * 20) / 2) - (40 / 2);
 
 		// Draw title
-		PutText((WINDOW_WIDTH / 2) - ((strlen(options_menu->title) * 5) / 2), y, options_menu->title, RGB(0xFF, 0xFF, 0xFF));
+		PutTextCentred(WINDOW_WIDTH / 2, y, options_menu->title, RGB(0xFF, 0xFF, 0xFF));
 
 		// Draw subtitle
 		if (options_menu->subtitle != NULL)
-			PutText((WINDOW_WIDTH / 2) - ((strlen(options_menu->subtitle) * 5) / 2), y + 14, options_menu->subtitle, RGB(0xFF, 0xFF, 0xFF));
+			PutTextCentred(WINDOW_WIDTH / 2, y + 14, options_menu->subtitle, RGB(0xFF, 0xFF, 0xFF));
 
 		y += 40;
 
@@ -418,11 +441,11 @@ static int EnterOptionsMenu(OptionsMenu *options_menu, size_t selected_option)
 			unsigned long option_colour = options_menu->options[i].disabled ? RGB(0x80, 0x80, 0x80) : RGB(0xFF, 0xFF, 0xFF);
 
 			// Draw option name
-			PutText(x, y - (9 / 2), options_menu->options[i].name, option_colour);
+			PutText(x, y - font_height / 2, options_menu->options[i].name, option_colour);
 
 			// Draw option value, if it has one
 			if (options_menu->options[i].value_string != NULL)
-				PutText(x + 100, y - (9 / 2), options_menu->options[i].value_string, option_colour);
+				PutText(x + 100, y - font_height / 2, options_menu->options[i].value_string, option_colour);
 
 			y += 20;
 		}
@@ -534,11 +557,11 @@ static int Callback_ControlsKeyboard_Rebind(OptionsMenu *parent_menu, size_t thi
 				CortBox(&grcFull, 0x000000);
 
 				const char *string = "Press a key to bind to this action:";
-				PutText((WINDOW_WIDTH / 2) - ((strlen(string) * 5) / 2), (WINDOW_HEIGHT / 2) - 10, string, RGB(0xFF, 0xFF, 0xFF));
-				PutText((WINDOW_WIDTH / 2) - ((strlen(parent_menu->options[this_option].name) * 5) / 2), (WINDOW_HEIGHT / 2) + 10, parent_menu->options[this_option].name, RGB(0xFF, 0xFF, 0xFF));
+				PutTextCentred(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 - 10, string, RGB(0xFF, 0xFF, 0xFF));
+				PutTextCentred(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 + 10, parent_menu->options[this_option].name, RGB(0xFF, 0xFF, 0xFF));
 
 				timeout_string[0] = '0' + (timeout / 60) + 1;
-				PutText((WINDOW_WIDTH / 2) - (5 / 2), (WINDOW_HEIGHT / 2) + 60, timeout_string, RGB(0xFF, 0xFF, 0xFF));
+				PutTextCentred(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 + 60, timeout_string, RGB(0xFF, 0xFF, 0xFF));
 
 				PutFramePerSecound();
 
@@ -609,7 +632,7 @@ static int Callback_ControlsController_Rebind(OptionsMenu *parent_menu, size_t t
 		case ACTION_OK:
 			PlaySoundObject(5, SOUND_MODE_PLAY);
 
-			JOYSTICK_STATUS old_state = gJoystickState;
+			DIRECTINPUTSTATUS old_state = gJoystickState;
 
 			char timeout_string[2];
 			timeout_string[1] = '\0';
@@ -650,11 +673,11 @@ static int Callback_ControlsController_Rebind(OptionsMenu *parent_menu, size_t t
 				CortBox(&grcFull, 0x000000);
 
 				const char *string = "Press a button to bind to this action:";
-				PutText((WINDOW_WIDTH / 2) - ((strlen(string) * 5) / 2), (WINDOW_HEIGHT / 2) - 10, string, RGB(0xFF, 0xFF, 0xFF));
-				PutText((WINDOW_WIDTH / 2) - ((strlen(parent_menu->options[this_option].name) * 5) / 2), (WINDOW_HEIGHT / 2) + 10, parent_menu->options[this_option].name, RGB(0xFF, 0xFF, 0xFF));
+				PutTextCentred(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 - 10, string, RGB(0xFF, 0xFF, 0xFF));
+				PutTextCentred(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 + 10, parent_menu->options[this_option].name, RGB(0xFF, 0xFF, 0xFF));
 
 				timeout_string[0] = '0' + (timeout / 60) + 1;
-				PutText((WINDOW_WIDTH / 2) - (5 / 2), (WINDOW_HEIGHT / 2) + 60, timeout_string, RGB(0xFF, 0xFF, 0xFF));
+				PutTextCentred(WINDOW_WIDTH, WINDOW_HEIGHT / 2 + 60, timeout_string, RGB(0xFF, 0xFF, 0xFF));
 
 				PutFramePerSecound();
 
@@ -689,7 +712,11 @@ static int Callback_ControlsController(OptionsMenu *parent_menu, size_t this_opt
 	}
 
 	OptionsMenu options_menu = {
-		Backend_IsConsole() ? "CONTROLS" : "CONTROLS (GAMEPAD)",
+	#if !defined(__WIIU__) && !defined(_3DS)
+		"CONTROLS (GAMEPAD)",
+	#else
+		"CONTROLS",
+	#endif
 		NULL,
 		options,
 		sizeof(options) / sizeof(options[0]),
@@ -712,7 +739,7 @@ static int Callback_ControlsController(OptionsMenu *parent_menu, size_t this_opt
 
 static int Callback_Soundtrack_Option(OptionsMenu *parent_menu, size_t this_option, CallbackAction action)
 {
-	CONFIG *conf = (CONFIG*)parent_menu->options[this_option].user_data;
+	CONFIGDATA *conf = (CONFIGDATA*)parent_menu->options[this_option].user_data;
 
 	switch (action)
 	{
@@ -743,7 +770,7 @@ static int Callback_Soundtrack(OptionsMenu *parent_menu, size_t this_option, Cal
 {
 	(void)parent_menu;
 
-	CONFIG *conf = (CONFIG*)parent_menu->options[this_option].user_data;
+	CONFIGDATA *conf = (CONFIGDATA*)parent_menu->options[this_option].user_data;
 
 	if (action != ACTION_OK)
 		return CALLBACK_CONTINUE;
@@ -794,7 +821,7 @@ static int Callback_Soundtrack(OptionsMenu *parent_menu, size_t this_option, Cal
 
 static int Callback_Framerate(OptionsMenu *parent_menu, size_t this_option, CallbackAction action)
 {
-	CONFIG *conf = (CONFIG*)parent_menu->options[this_option].user_data;
+	CONFIGDATA *conf = (CONFIGDATA*)parent_menu->options[this_option].user_data;
 
 	const char *strings[] = {"50FPS", "60FPS"};
 
@@ -831,7 +858,7 @@ static int Callback_Framerate(OptionsMenu *parent_menu, size_t this_option, Call
 
 static int Callback_Vsync(OptionsMenu *parent_menu, size_t this_option, CallbackAction action)
 {
-	CONFIG *conf = (CONFIG*)parent_menu->options[this_option].user_data;
+	CONFIGDATA *conf = (CONFIGDATA*)parent_menu->options[this_option].user_data;
 
 	const char *strings[] = {"Off", "On"};
 
@@ -869,7 +896,7 @@ static int Callback_Vsync(OptionsMenu *parent_menu, size_t this_option, Callback
 
 static int Callback_Resolution(OptionsMenu *parent_menu, size_t this_option, CallbackAction action)
 {
-	CONFIG *conf = (CONFIG*)parent_menu->options[this_option].user_data;
+	CONFIGDATA *conf = (CONFIGDATA*)parent_menu->options[this_option].user_data;
 
 	const char *strings[] = {"Fullscreen", "Windowed 426x240", "Windowed 852x480", "Windowed 1278x720", "Windowed 1704x960"};
 
@@ -917,7 +944,7 @@ static int Callback_Resolution(OptionsMenu *parent_menu, size_t this_option, Cal
 
 static int Callback_SmoothScrolling(OptionsMenu *parent_menu, size_t this_option, CallbackAction action)
 {
-	CONFIG *conf = (CONFIG*)parent_menu->options[this_option].user_data;
+	CONFIGDATA *conf = (CONFIGDATA*)parent_menu->options[this_option].user_data;
 
 	const char *strings[] = {"Off", "On"};
 
@@ -960,35 +987,50 @@ static int Callback_Options(OptionsMenu *parent_menu, size_t this_option, Callba
 		return CALLBACK_CONTINUE;
 
 	// Make the options match the configuration data
-	CONFIG conf;
-	if (!LoadConfigData(&conf))
-		DefaultConfigData(&conf);
+	static bool config_loaded = false;
+	static CONFIGDATA conf;
 
-	BOOL is_console = Backend_IsConsole();
+	if (!config_loaded)
+	{
+		config_loaded = true;
 
-	Option options_console[] = {
-		{"Controls", Callback_ControlsController, NULL, NULL, 0, FALSE},
-		{"Soundtrack", Callback_Soundtrack, &conf, NULL, 0, FALSE},
-		{"Framerate", Callback_Framerate, &conf, NULL, 0, FALSE},
-		{"Smooth Scrolling", Callback_SmoothScrolling, &conf, NULL, 0, FALSE},
-	};
+		if (!LoadConfigData(&conf))
+			DefaultConfigData(&conf);
+	}
 
-	Option options_pc[] = {
+	const CONFIGDATA previous_conf = conf;
+
+	Option options[] = {
+	#if !defined(__WIIU__) && !defined(_3DS)
 		{"Controls (Keyboard)", Callback_ControlsKeyboard, NULL, NULL, 0, FALSE},
 		{"Controls (Gamepad)", Callback_ControlsController, NULL, NULL, 0, FALSE},
+	#else
+		{"Controls", Callback_ControlsController, NULL, NULL, 0, FALSE},
+	#endif
+
 		{"Soundtrack", Callback_Soundtrack, &conf, NULL, 0, FALSE},
 		{"Framerate", Callback_Framerate, &conf, NULL, 0, FALSE},
+
+	#if !defined(__WIIU__) && !defined(_3DS)
 		{"V-sync", Callback_Vsync, &conf, NULL, 0, FALSE},
 		{"Resolution", Callback_Resolution, &conf, NULL, 0, FALSE},
-		{"Smooth Scrolling", Callback_SmoothScrolling, &conf, NULL, 0, FALSE}
+	#endif
+
+	#if !defined(_3DS)
+		{"Smooth Scrolling", Callback_SmoothScrolling, &conf, NULL, 0, FALSE},
+	#endif
 	};
 
 	OptionsMenu options_menu = {
 		"OPTIONS",
 		restart_required ? "RESTART REQUIRED" : NULL,
-		is_console ? options_console : options_pc,
-		is_console ? (sizeof(options_console) / sizeof(options_console[0])) : (sizeof(options_pc) / sizeof(options_pc[0])),
-		is_console ? -60 : -70,
+		options,
+		sizeof(options) / sizeof(options[0]),
+	#if !defined(__WIIU__) && !defined(_3DS)
+		-70,
+	#else
+		-60,
+	#endif
 		TRUE
 	};
 
@@ -1001,7 +1043,17 @@ static int Callback_Options(OptionsMenu *parent_menu, size_t this_option, Callba
 	// Save our changes to the configuration file
 	memcpy(conf.bindings, bindings, sizeof(bindings));
 
-	SaveConfigData(&conf);
+	if (memcmp(&conf, &previous_conf, sizeof(CONFIGDATA)))
+	{
+		// Draw 'saving' prompt
+		CortBox(&grcFull, 0x000000);
+		PutTextCentred(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, "Saving...", RGB(0xFF, 0xFF, 0xFF));
+		PutFramePerSecound();
+		if (!Flip_SystemTask())
+			return CALLBACK_EXIT;
+
+		SaveConfigData(&conf);
+	}
 
 	return return_value;
 }

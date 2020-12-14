@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -7,6 +14,7 @@
 #include "Boss.h"
 #include "Bullet.h"
 #include "Caret.h"
+#include "CommonDefines.h"
 #include "Frame.h"
 #include "Game.h"
 #include "Map.h"
@@ -27,7 +35,7 @@ void ActNpc300(NPCHAR *npc)
 	}
 
 	if (++npc->ani_wait % 8 == 1)
-		SetCaret(npc->x + (Random(-8, 8) * 0x200), npc->y + (8 * 0x200), 13, 1);
+		SetCaret(npc->x + (Random(-8, 8) * 0x200), npc->y + (8 * 0x200), CARET_TINY_PARTICLES, DIR_UP);
 
 	npc->rect = rc;
 }
@@ -89,7 +97,7 @@ void ActNpc301(NPCHAR *npc)
 	if (++npc->ani_wait > 2)
 	{
 		npc->ani_wait = 0;
-		SetCaret(npc->x, npc->y, 7, 4);
+		SetCaret(npc->x, npc->y, CARET_EXHAUST, DIR_AUTO);
 	}
 
 	npc->ani_no = (npc->count1 + 0x10) / 0x20;

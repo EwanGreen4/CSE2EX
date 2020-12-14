@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -1001,7 +1008,7 @@ void ActNpc067(NPCHAR *npc)
 			if (++npc->act_wait == 30)
 			{
 				PlaySoundObject(101, SOUND_MODE_PLAY);
-				SetFlash(0, 0, 2);
+				SetFlash(0, 0, FLASH_MODE_FLASH);
 				npc->act_no = 27;
 				npc->ani_no = 7;
 			}

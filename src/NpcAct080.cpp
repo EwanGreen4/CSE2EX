@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "NpcAct.h"
 
 #include <stddef.h>
@@ -389,7 +396,7 @@ void ActNpc082(NPCHAR *npc)
 			if (++npc->act_wait == 30)
 			{
 				PlaySoundObject(101, SOUND_MODE_PLAY);
-				SetFlash(0, 0, 2);
+				SetFlash(0, 0, FLASH_MODE_FLASH);
 				npc->act_no = 27;
 				npc->ani_no = 7;
 			}
@@ -637,7 +644,7 @@ void ActNpc084(NPCHAR *npc)
 {
 	if (npc->flag & 0xFF)
 	{
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 		npc->cond = 0;
 	}
 
@@ -664,7 +671,7 @@ void ActNpc084(NPCHAR *npc)
 
 	if (++npc->count1 > 300)
 	{
-		SetCaret(npc->x, npc->y, 2, 0);
+		SetCaret(npc->x, npc->y, CARET_PROJECTILE_DISSIPATION, DIR_LEFT);
 		npc->cond = 0;
 	}
 }
@@ -737,7 +744,7 @@ void ActNpc086(NPCHAR *npc)
 			npc->ani_no = 0;
 	}
 
-	if (gBack.type == 5 || gBack.type == 6)
+	if (gBack.type == BACKGROUND_TYPE_AUTOSCROLL || gBack.type == BACKGROUND_TYPE_CLOUDS_WINDY)
 	{
 		if (npc->act_no == 0)
 		{
@@ -818,7 +825,7 @@ void ActNpc087(NPCHAR *npc)
 			npc->ani_no = 0;
 	}
 
-	if (gBack.type == 5 || gBack.type == 6)
+	if (gBack.type == BACKGROUND_TYPE_AUTOSCROLL || gBack.type == BACKGROUND_TYPE_CLOUDS_WINDY)
 	{
 		if (npc->act_no == 0)
 		{
@@ -1410,7 +1417,7 @@ void ActNpc093(NPCHAR *npc)
 			if (++npc->act_wait > 200)
 			{
 				npc->act_wait = 0;
-				SetCaret(npc->x, npc->y, 5, 0);
+				SetCaret(npc->x, npc->y, CARET_ZZZ, DIR_LEFT);
 			}
 
 			break;

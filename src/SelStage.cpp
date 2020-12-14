@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "SelStage.h"
 
 #include <string.h>
@@ -14,7 +21,7 @@
 #include "Sound.h"
 #include "TextScr.h"
 
-PERMIT_STAGE gPermitStage[8];
+PERMIT_STAGE gPermitStage[STAGE_MAX];
 
 int gSelectedStage;
 int gStageSelectTitleY;
@@ -28,7 +35,7 @@ BOOL AddPermitStage(int index, int event)
 {
 	int i = 0;
 
-	while (i < 8)
+	while (i < STAGE_MAX)
 	{
 		if (gPermitStage[i].index == index)
 			break;
@@ -39,7 +46,7 @@ BOOL AddPermitStage(int index, int event)
 		++i;
 	}
 
-	if (i == 8)
+	if (i == STAGE_MAX)
 		return FALSE;
 
 	gPermitStage[i].index = index;
@@ -52,18 +59,18 @@ BOOL SubPermitStage(int index)
 {
 	int i;
 
-	for (i = 0; i < 8; ++i)
+	for (i = 0; i < STAGE_MAX; ++i)
 		if (gPermitStage[i].index == index)
 			break;
 
 #ifdef FIX_BUGS
-	if (i == 8)
+	if (i == STAGE_MAX)
 #else
-	if (i == 32)
+	if (i == 32) // Same value as 'ITEM_MAX'
 #endif
 		return FALSE;
 
-	for (++i; i < 8; ++i)
+	for (++i; i < STAGE_MAX; ++i)
 		gPermitStage[i - 1] = gPermitStage[i];
 
 	gPermitStage[i - 1].index = 0;
@@ -141,11 +148,14 @@ void PutStageSelectObject(void)
 
 		PutBitmap3(&rcView, PixelToScreenCoord(stage_x + (gSelectedStage * 40)), PixelToScreenCoord((WINDOW_HEIGHT / 2) - 56), &rcCur[flash / 2 % 2], SURFACE_ID_TEXT_BOX);
 
-		for (i = 0; i < 8; ++i)
+		for (i = 0; i < STAGE_MAX; ++i)
 		{
 			if (gPermitStage[i].index == 0)
 				break;
 
+			// Interestingly, there's code for reading multiple rows of icons
+			// from the 'StageImage.pbm' file when there are more than 8 stages,
+			// despite only 6 icons ever being used.
 			rcStage.left = (gPermitStage[i].index % 8) * 32;
 			rcStage.right = rcStage.left + 32;
 			rcStage.top = (gPermitStage[i].index / 8) * 16;
@@ -222,7 +232,8 @@ int StageSelectLoop(int *p_event)
 			StopTextScript();
 			break;
 		}
-		else if (gKeyTrg & gKeyCancel)
+
+		if (gKeyTrg & gKeyCancel)
 		{
 			StopTextScript();
 			LoadTextScript_Stage(old_script_path.c_str());

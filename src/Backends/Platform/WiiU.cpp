@@ -1,3 +1,6 @@
+// Released under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "../Misc.h"
 
 #include <stdarg.h>
@@ -14,8 +17,11 @@
 
 static unsigned long ticks_per_second;
 
-bool Backend_Init(void)
+bool Backend_Init(void (*drag_and_drop_callback)(const char *path), void (*window_focus_callback)(bool focus))
 {
+	(void)drag_and_drop_callback;
+	(void)window_focus_callback;
+
 	WHBProcInit();
 
 	if (!WHBMountSdCard())
@@ -42,14 +48,16 @@ void Backend_PostWindowCreation(void)
 	
 }
 
-bool Backend_GetBasePath(std::string *string_buffer)
+bool Backend_GetPaths(std::string *module_path, std::string *data_path)
 {
-	*string_buffer = WHBGetSdCardMountPath();
+	*module_path = WHBGetSdCardMountPath();
 #ifdef JAPANESE
-	*string_buffer += "/CSE2-enhanced-jp";
+	*module_path += "/CSE2-enhanced-jp";
 #else
-	*string_buffer += "/CSE2-enhanced-en";
+	*module_path += "/CSE2-enhanced-en";
 #endif
+
+	*data_path = *module_path + "/data";
 
 	return true;
 }
@@ -59,21 +67,21 @@ void Backend_HideMouse(void)
 	
 }
 
-void Backend_SetWindowIcon(const unsigned char *rgb_pixels, unsigned int width, unsigned int height)
+void Backend_SetWindowIcon(const unsigned char *rgb_pixels, size_t width, size_t height)
 {
 	(void)rgb_pixels;
 	(void)width;
 	(void)height;
 }
 
-void Backend_SetCursor(const unsigned char *rgb_pixels, unsigned int width, unsigned int height)
+void Backend_SetCursor(const unsigned char *rgba_pixels, size_t width, size_t height)
 {
-	(void)rgb_pixels;
+	(void)rgba_pixels;
 	(void)width;
 	(void)height;
 }
 
-void PlaybackBackend_EnableDragAndDrop(void)
+void Backend_EnableDragAndDrop(void)
 {
 	
 }
@@ -146,9 +154,4 @@ void Backend_GetDisplayMode(Backend_DisplayMode *display_mode)
 	display_mode->width = 854;
 	display_mode->height = 480;
 	display_mode->refresh_rate = 60;
-}
-
-bool Backend_IsConsole(void)
-{
-	return true;
 }

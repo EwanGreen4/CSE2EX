@@ -1,4 +1,13 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #pragma once
+
+#include <stddef.h>
 
 #include "WindowsWrapper.h"
 
@@ -8,6 +17,9 @@ extern RECT grcFull;
 extern BOOL gb60fps;
 extern BOOL gbSmoothScrolling;
 extern BOOL gbVsync;
+
+extern size_t font_width;
+extern size_t font_height;
 
 typedef enum SurfaceID
 {
@@ -53,11 +65,11 @@ BOOL MakeSurface_Resource(const char *name, SurfaceID surf_no);
 BOOL MakeSurface_File(const char *name, SurfaceID surf_no);
 BOOL ReloadBitmap_Resource(const char *name, SurfaceID surf_no);
 BOOL ReloadBitmap_File(const char *name, SurfaceID surf_no);
-BOOL MakeSurface_Generic(int bxsize, int bysize, SurfaceID surf_no, BOOL bSystem);
+BOOL MakeSurface_Generic(int bxsize, int bysize, SurfaceID surf_no, BOOL bSystem, BOOL bTarget);
 void BackupSurface(SurfaceID surf_no, const RECT *rect);
 void PutBitmap3(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID surf_no);
 void PutBitmap4(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID surf_no);
-void Surface2Surface(int x, int y, const RECT *rect, int to, int from);
+void Surface2Surface(int x, int y, const RECT *rect, SurfaceID to, SurfaceID from);
 unsigned long GetCortBoxColor(unsigned long col);
 void CortBox(const RECT *rect, unsigned long col);
 void CortBox2(const RECT *rect, unsigned long col, SurfaceID surf_no);

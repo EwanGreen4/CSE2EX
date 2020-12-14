@@ -1,10 +1,17 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #pragma once
 
 #include "WindowsWrapper.h"
 
 // Limits for the amount of weapons and items
 #define ARMS_MAX 8
-#define ITEM_MAX 0x20
+#define ITEM_MAX 32
 
 // "Arms" is a synonym of "weapon" here
 // "Code" means "ID" here

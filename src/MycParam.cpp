@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "MycParam.h"
 
 #include <stddef.h>
@@ -69,7 +76,7 @@ void AddExpMyChar(int x)
 				if (gArmsData[gSelectedArms].code != 13)
 				{
 					PlaySoundObject(27, SOUND_MODE_PLAY);
-					SetCaret(gMC.x, gMC.y, 10, 0);
+					SetCaret(gMC.x, gMC.y, CARET_LEVEL_UP, DIR_LEFT);
 				}
 			}
 		}
@@ -112,7 +119,7 @@ void DamageMyChar(int damage)
 #ifdef FIX_BUGS
 	if (!(g_GameFlags & 2))
 #else
-	// I'm preeeetty sure this is a typo. The Linux port optimised it out.
+	// I'm preeeetty sure this is a typo. The Linux port optimised this entire check out.
 	if (!(g_GameFlags | 2))
 #endif
 		return;
@@ -159,7 +166,7 @@ void DamageMyChar(int damage)
 			gArmsData[gSelectedArms].exp = gArmsLevelTable[arms_code].exp[lv] + gArmsData[gSelectedArms].exp;
 
 			if (gMC.life > 0 && gArmsData[gSelectedArms].code != 13)
-				SetCaret(gMC.x, gMC.y, 10, 2);
+				SetCaret(gMC.x, gMC.y, CARET_LEVEL_UP, DIR_RIGHT);
 		}
 		else
 		{
@@ -175,7 +182,7 @@ void DamageMyChar(int damage)
 	{
 		PlaySoundObject(17, SOUND_MODE_PLAY);
 		gMC.cond = 0;
-		SetDestroyNpChar(gMC.x, gMC.y, 0x1400, 0x40);
+		SetDestroyNpChar(gMC.x, gMC.y, 10 * 0x200, 0x40);
 		StartTextScript(40);
 	}
 }
@@ -274,7 +281,7 @@ void PutArmsEnergy(BOOL flash)
 
 	int lv = gArmsData[gSelectedArms].level - 1;
 
-#ifdef FIX_BUGS
+#ifdef FIX_MAJOR_BUGS
 	// When the player has no weapons, the default level is 0, which becomes -1.
 	// Catch it, and set it to 0 instead, so the following array-accesses aren't
 	// out-of-bounds.

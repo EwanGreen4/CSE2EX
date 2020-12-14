@@ -1,3 +1,10 @@
+// THIS IS DECOMPILED PROPRIETARY CODE - USE AT YOUR OWN RISK.
+//
+// The original code belongs to Daisuke "Pixel" Amaya.
+//
+// Modifications and custom code are under the MIT licence.
+// See LICENCE.txt for details.
+
 #include "BossAlmo2.h"
 
 #include <stddef.h>
@@ -649,7 +656,7 @@ void ActBossChar_Undead(void)
 			{
 				gBoss[0].act_wait = 0;
 				gBoss[0].act_no = 1001;
-				SetFlash(gBoss[0].x, gBoss[0].y, 1);
+				SetFlash(gBoss[0].x, gBoss[0].y, FLASH_MODE_EXPLOSION);
 				PlaySoundObject(35, SOUND_MODE_PLAY);
 			}
 
