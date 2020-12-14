@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/Clownacy/CSE2EX.svg?branch=portable)](https://travis-ci.com/Clownacy/CSE2EX)
+[![Build Status](https://travis-ci.com/Clownacy/CSE2EX.svg?branch=portable)](https://travis-ci.com/Clownacy/CSE2EX) (Travis embed is broken due to the original repository being down)
 
 # CSE2EX
 
